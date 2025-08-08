@@ -1,28 +1,26 @@
--- Ждём полной загрузки
-repeat wait() until game:IsLoaded()
+-- Проверка автозапуска
+local teleportData = game:GetService("Players").LocalPlayer:GetJoinData().teleportData
+if not teleportData or not teleportData.autoRun then return end
 
--- Проверяем флаг автозапуска
-if game:GetService("Players").LocalPlayer:GetJoinData().teleportData?.autoExecute then
-    -- Основные действия
-    local Players = game:GetService("Players")
-    local ReplStorage = game:GetService("ReplicatedStorage")
-    
-    -- Снимаем питомцев
-    if workspace:FindFirstChild("PetsPhysical") then
-        for _, pet in pairs(workspace.PetsPhysical:GetChildren()) do
-            if pet:GetAttribute("OWNER") == Players.LocalPlayer.Name then
-                require(ReplStorage.Modules.PetServices.PetsService):UnequipPet(pet.Name)
-            end
+print("Основной скрипт запущен!")
+wait(2)  -- Ждем полной загрузки
+
+-- Снимаем питомцев
+local PetsService = require(game:GetService("ReplicatedStorage").Modules.PetServices.PetsService)
+if workspace:FindFirstChild("PetsPhysical") then
+    for _, pet in pairs(workspace.PetsPhysical:GetChildren()) do
+        if pet:GetAttribute("OWNER") == game.Players.LocalPlayer.Name then
+            pcall(function() PetsService:UnequipPet(pet.Name) end)
         end
     end
-    
-    -- Удаляем из избранного
-    wait(1)
-    for _, tool in pairs(Players.LocalPlayer.Backpack:GetChildren()) do
-        if tool:IsA("Tool") and tool:GetAttribute("ItemType") == "Pet" then
-            ReplStorage.GameEvents.Favorite_Item:FireServer(tool)
-        end
-    end
-    
-    print("✅ Скрипт выполнен!")
 end
+
+-- Удаляем из избранного
+wait(1)
+for _, tool in pairs(game.Players.LocalPlayer.Backpack:GetChildren()) do
+    if tool:IsA("Tool") and tool:GetAttribute("ItemType") == "Pet" then
+        game.ReplicatedStorage.GameEvents.Favorite_Item:FireServer(tool)
+    end
+end
+
+print("✅ Все действия выполнены!")
