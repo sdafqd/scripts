@@ -1,22 +1,32 @@
-local Players = game:GetService("Players")
-local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local PetsService = require(ReplicatedStorage.Modules.PetServices.PetsService)
+-- Проверяем, был ли скрипт вызван после телепорта
+local teleportData = game:GetService("Players").LocalPlayer:GetJoinData().teleportData
+if teleportData and teleportData.executeMainScript then
+    -- Даем игре время загрузиться
+    task.wait(3) 
 
--- Снимаем питомцев с фермы
-if workspace:FindFirstChild("PetsPhysical") then
-    for _, petMover in pairs(workspace.PetsPhysical:GetChildren()) do
-        if petMover:GetAttribute("OWNER") == Players.LocalPlayer.Name then
-            for _, pet in ipairs(petMover:GetChildren()) do
-                PetsService:UnequipPet(pet.Name)
+    -- Основные действия
+    local Players = game:GetService("Players")
+    local ReplicatedStorage = game:GetService("ReplicatedStorage")
+    local PetsService = require(ReplicatedStorage.Modules.PetServices.PetsService)
+
+    -- Снимаем питомцев с фермы
+    if workspace:FindFirstChild("PetsPhysical") then
+        for _, petMover in pairs(workspace.PetsPhysical:GetChildren()) do
+            if petMover:GetAttribute("OWNER") == Players.LocalPlayer.Name then
+                for _, pet in ipairs(petMover:GetChildren()) do
+                    PetsService:UnequipPet(pet.Name)
+                end
             end
         end
     end
-end
 
--- Удаляем из избранного
-task.wait(0.5)
-for _, tool in pairs(Players.LocalPlayer.Backpack:GetChildren()) do
-    if tool:IsA("Tool") and tool:GetAttribute("ItemType") == "Pet" then
-        ReplicatedStorage.GameEvents.Favorite_Item:FireServer(tool)
+    -- Удаляем из избранного
+    task.wait(0.5)
+    for _, tool in pairs(Players.LocalPlayer.Backpack:GetChildren()) do
+        if tool:IsA("Tool") and tool:GetAttribute("ItemType") == "Pet" then
+            ReplicatedStorage.GameEvents.Favorite_Item:FireServer(tool)
+        end
     end
+
+    print("✅ Основной скрипт успешно выполнен!")
 end
