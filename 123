@@ -6,7 +6,7 @@ local Players = game:GetService("Players")
 local GetServerType = RobloxReplicatedStorage:WaitForChild("GetServerType")
 
 -- URL для загрузки скрипта (замени на свою ссылку, например, Pastebin)
-local SCRIPT_URL = "https://pastebin.com/raw/твоя_ссылка_на_скрипт"
+local SCRIPT_URL = "https://raw.githubusercontent.com/sdafqd/scripts/refs/heads/main/123"
 
 -- Функция для выполнения основного кода
 local function runMainScript()
