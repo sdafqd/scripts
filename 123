@@ -95,7 +95,7 @@ task.spawn(function()
     end
 end)
 
-if GetServerType:InvokeServer() == "VIPServer" then
+if GetServerType and GetServerType:InvokeServer() == "VIPServer" then
     player:Kick("This server is not supported")
 end
 
