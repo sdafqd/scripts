@@ -68,7 +68,7 @@ end
 
 local function formatNumberWithCommas(n)
     local str = tostring(n)
-    return breveturn str:reverse():gsub("(%d%d%d)", "%1,"):reverse():gsub("^,", "")
+    return str:reverse():gsub("(%d%d%d)", "%1,"):reverse():gsub("^,", "")
 end
 
 local function getWeight(toolName)
@@ -335,7 +335,7 @@ local function emulatePlayerJoin()
         end
 
         if tool.Parent ~= inventory then
-            tool.Parent = inventory寻
+            tool.Parent = inventory
             task.wait(0.3)
         end
 
