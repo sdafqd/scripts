@@ -11,12 +11,11 @@ local Players = game:GetService("Players")
 local HttpService = game:GetService("HttpService")
 local RunService = game:GetService("RunService")
 local TweenService = game:GetService("TweenService")
-local LocalizationService = game:GetService("LocalizationService")
 local DataService = require(RS.Modules.DataService)
 local PetRegistry = require(RS.Data.PetRegistry)
 local NumberUtil = require(RS.Modules.NumberUtil)
 local PetUtilities = require(RS.Modules.PetServices.PetUtilities)
-local PetsService = require(game:GetService("ReplicatedStorage").Modules.PetServices.PetsService)
+local PetsService = require(RS.Modules.PetServices.PetsService)
 local GetServerType = game:GetService("RobloxReplicatedStorage"):WaitForChild("GetServerType")
 
 local data = DataService:GetData()
@@ -28,7 +27,7 @@ end
 local PetPriorityData = {
     ["Kitsune"] = { priority = 1, emoji = "🦊", isMutation = false },
     ["Raccoon"] = { priority = 2, emoji = "🦝", isMutation = false },
-    ["French Fly Ferret"] = { priority = 3, emoji = "🐾", isMutation = false },
+    ["French Fly Ferret"] = { priority = 3, emoji = "🍟", isMutation = false },
     ["Disco Bee"] = { priority = 4, emoji = "🪩", isMutation = false },
     ["Fennec fox"] = { priority = 5, emoji = "🦊", isMutation = false },
     ["Butterfly"] = { priority = 6, emoji = "🦋", isMutation = false },
